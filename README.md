@@ -452,13 +452,30 @@ Thank you for your interest in contributing to our project! We appreciate your h
 
 **Modify the main files:**
 
-* [action.yml](./action.yml) — GitHub Action Metadata File and Inline Entrypoint Script for `pritunl-client.sh`.
-* [pritunl-client.sh](./pritunl-client.sh) — Pritunl Client Script File, the GitHub Action Logic.
+* [action.yml](./action.yml) — GitHub Action Metadata File and Go entrypoint specification.
+* [cmd/pritunl-action](./cmd/pritunl-action) — Main Go executable entrypoint.
+* [pkg/engine](./pkg/engine) — Deep VPN Connection Engine module.
+* [pkg/cli](./pkg/cli) — Pritunl CLI Adapter Seam.
+* [pkg/provisioner](./pkg/provisioner) — Platform Provisioner for Linux, macOS, and Windows.
 
+**Test your changes locally:**
 
-**Test your changes thoroughly:**
+1. **Unit Tests** (Fast, in-memory mocks):
+   ```bash
+   go test -v ./pkg/...
+   ```
 
-Ensure your contributions are reliable by testing your fork using the same GitHub Actions workflows we use for our project. Please update or add new test workflows in the [.github/workflows/](./.github/workflows)`connection-tests-*.yml` files as needed to cover your changes.
+2. **Integration & E2E Tests with Docker Compose**:
+   ```bash
+   # Start local Pritunl Server & MongoDB stack
+   docker compose -f test/e2e/docker-compose.test.yml up -d --wait
+
+   # Run live E2E connection tests
+   go test -v -tags=e2e ./test/e2e/...
+
+   # Teardown stack
+   docker compose -f test/e2e/docker-compose.test.yml down -v
+   ```
 
 #### Use Your Fork
 

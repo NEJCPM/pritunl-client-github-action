@@ -9,9 +9,9 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-22.04
-          - macos-13
-          - windows-2022
+          - ubuntu-24.04
+          - macos-15
+          - windows-2025
         profile-server:
           - gha-automator-qa2 (dev-team)
           - dev-team, qa-team
@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4 # Checkout the code to run tests
+        uses: actions/checkout@v7.0.1 # Checkout the code to run tests
 
       - name: Setup Pritunl Profile
         id: pritunl-connection

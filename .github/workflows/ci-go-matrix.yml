@@ -1,0 +1,30 @@
+name: Go CI Matrix
+
+on:
+  push:
+    branches: [ main, v1 ]
+  pull_request:
+    branches: [ main, v1 ]
+
+jobs:
+  test:
+    name: "go-ci (${{ matrix.os }})"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version: '1.26.5'
+
+      - name: Verify Build
+        run: go build -v ./cmd/pritunl-action
+
+      - name: Run Unit Tests
+        run: go test -v ./pkg/...

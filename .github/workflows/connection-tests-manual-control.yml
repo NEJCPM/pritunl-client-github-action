@@ -9,15 +9,15 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-22.04
-          - macos-13
-          - windows-2022
+          - ubuntu-24.04
+          - macos-15
+          - windows-2025
     runs-on: ${{ matrix.os }}
     name: "run:${{ matrix.os }}"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4 # Checkout the code to run tests
+        uses: actions/checkout@v7.0.1 # Checkout the code to run tests
 
       - name: Setup Pritunl Profile
         id: pritunl-connection # A `Setup Step ID` has been added as a reference identifier for the output `client-id`.

@@ -9,20 +9,18 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-24.04 # WARNING: Please note that this is a Beta version.
+          - ubuntu-24.04
           - ubuntu-22.04
-          - ubuntu-20.04
-          - macos-14 # NOTE: An Arm64 Runner.
-          - macos-13
-          - macos-12
+          - macos-15
+          - macos-14
+          - windows-2025
           - windows-2022
-          - windows-2019
     runs-on: ${{ matrix.os }}
     name: "run:${{ matrix.os }}"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4 # Checkout the code to run tests
+        uses: actions/checkout@v7.0.1 # Checkout the code to run tests
 
       - name: Setup Pritunl Profile
         id: pritunl-connection

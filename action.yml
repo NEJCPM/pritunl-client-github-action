@@ -68,6 +68,11 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Setup Go
+      uses: actions/setup-go@v7.0.0
+      with:
+        go-version: '1.26.5'
+
     - name: Setup Pritunl Client
       id: pritunl-client
       env:
@@ -83,24 +88,4 @@ runs:
         PRITUNL_CONCEALED_OUTPUTS: ${{ inputs.concealed-outputs }}
       shell: bash
       run: |
-        # main entry point for executing the 'pritunl-client.sh' script
-
-        # Define a function to determine the path separator based on the runner OS
-        os_path_separator() {
-          # Determine the path separator based on the runner OS
-          case "${RUNNER_OS}" in
-          Windows)
-            # Use a backslash (\) for Windows paths to avoid file name confusion
-            echo '\'
-            ;;
-          *)
-            # Use a forward slash (/) for non-Windows OSes (Linux, macOS, etc.) for consistency
-            echo '/'
-            ;;
-          esac
-        }
-
-        # Run the 'pritunl-client.sh' script using the dynamically constructed path
-        # The path is constructed by combining 'GITHUB_ACTION_PATH' with the appropriate path separator by OS
-        # and the script name 'pritunl-client.sh' to ensure correct script execution
-        ${GITHUB_ACTION_PATH}$(os_path_separator)pritunl-client.sh
+        go run "${GITHUB_ACTION_PATH}/cmd/pritunl-action"

@@ -88,4 +88,4 @@ runs:
         PRITUNL_CONCEALED_OUTPUTS: ${{ inputs.concealed-outputs }}
       shell: bash
       run: |
-        go run "${GITHUB_ACTION_PATH}/cmd/pritunl-action"
+        (cd "${GITHUB_ACTION_PATH}" && go run ./cmd/pritunl-action)

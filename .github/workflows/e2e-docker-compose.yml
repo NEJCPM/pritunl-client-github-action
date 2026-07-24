@@ -1,0 +1,36 @@
+name: Integration & E2E Tests (Docker Compose)
+
+on:
+  push:
+    branches: [main, v1]
+  pull_request:
+    branches: [main, v1]
+  workflow_dispatch:
+
+jobs:
+  e2e-docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version: '1.26.5'
+
+      - name: Run Unit Tests
+        run: go test -v ./pkg/...
+
+      - name: Start Docker Compose Pritunl Stack
+        run: |
+          docker compose -f test/e2e/docker-compose.test.yml up -d --wait
+
+      - name: Run E2E Integration Tests
+        run: |
+          go test -v -tags=e2e ./test/e2e/...
+
+      - name: Teardown Docker Compose
+        if: always()
+        run: |
+          docker compose -f test/e2e/docker-compose.test.yml down -v

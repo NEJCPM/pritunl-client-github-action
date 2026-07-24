@@ -72,6 +72,7 @@ runs:
       uses: actions/setup-go@v7.0.0
       with:
         go-version: '1.26.5'
+        cache: false
 
     - name: Setup Pritunl Client
       id: pritunl-client

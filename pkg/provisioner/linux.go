@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/nathanielvarona/pritunl-client-github-action/pkg/domain"
@@ -13,7 +14,6 @@ import (
 type LinuxProvisioner struct{}
 
 func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfig) error {
-	// Update package list and install base VPN dependencies
 	if err := runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y"); err != nil {
 		return fmt.Errorf("apt-get update failed: %w", err)
 	}
@@ -30,7 +30,10 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 		return fmt.Errorf("failed to install VPN dependencies: %w", err)
 	}
 
-	// Install Pritunl Client
+	if err := ensureMultiarch(ctx); err != nil {
+		return fmt.Errorf("failed to configure multiarch: %w", err)
+	}
+
 	if cfg.ClientVersion == "" || cfg.ClientVersion == "from-package-manager" {
 		gpgKey := os.Getenv("PRITUNL_LINUX_RUNNER_GPG_KEY")
 		if gpgKey == "" {
@@ -57,11 +60,14 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 		if err := runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y"); err != nil {
 			return fmt.Errorf("apt-get update after pritunl repo setup failed: %w", err)
 		}
-		if err := runCmd(ctx, "sudo", "apt-get", "install", "-qq", "-o=Dpkg::Use-Pty=0", "-y", "pritunl-client"); err != nil {
+		pkgName := "pritunl-client"
+		if runtime.GOARCH == "arm64" {
+			pkgName = "pritunl-client:amd64"
+		}
+		if err := runCmd(ctx, "sudo", "apt-get", "install", "-qq", "-o=Dpkg::Use-Pty=0", "-y", pkgName); err != nil {
 			return fmt.Errorf("failed to install pritunl-client package: %w", err)
 		}
 	} else {
-		// Version specific deb download
 		distroCodename, err := getLSBCodename(ctx)
 		if err != nil {
 			distroCodename = "noble"
@@ -74,12 +80,35 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 		}
 		defer os.Remove(installFile)
 
-		if err := runCmd(ctx, "sudo", "apt-get", "install", "-qq", "-o=Dpkg::Use-Pty=0", "-y", installFile); err != nil {
-			return fmt.Errorf("failed to install deb package %s: %w", installFile, err)
+		if runtime.GOARCH == "arm64" {
+			if err := runCmd(ctx, "sudo", "dpkg", "-i", "--force-architecture", installFile); err != nil {
+				return fmt.Errorf("failed to install deb package %s: %w", installFile, err)
+			}
+			if err := runCmd(ctx, "sudo", "apt-get", "install", "-f", "-qq", "-y"); err != nil {
+				return fmt.Errorf("failed to fix dependencies after deb install: %w", err)
+			}
+		} else {
+			if err := runCmd(ctx, "sudo", "apt-get", "install", "-qq", "-o=Dpkg::Use-Pty=0", "-y", installFile); err != nil {
+				return fmt.Errorf("failed to install deb package %s: %w", installFile, err)
+			}
 		}
 	}
 
+	if _, err := exec.LookPath("pritunl-client"); err != nil {
+		return fmt.Errorf("pritunl-client not found in PATH after installation: %w", err)
+	}
+
 	return nil
+}
+
+func ensureMultiarch(ctx context.Context) error {
+	if runtime.GOARCH != "arm64" {
+		return nil
+	}
+	if err := runCmd(ctx, "sudo", "dpkg", "--add-architecture", "amd64"); err != nil {
+		return err
+	}
+	return runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y")
 }
 
 func getLSBCodename(ctx context.Context) (string, error) {

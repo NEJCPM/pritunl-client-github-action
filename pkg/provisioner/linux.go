@@ -108,6 +108,19 @@ func ensureMultiarch(ctx context.Context) error {
 	if err := runCmd(ctx, "sudo", "dpkg", "--add-architecture", "amd64"); err != nil {
 		return err
 	}
+	codename, err := getLSBCodename(ctx)
+	if err != nil {
+		codename = "noble"
+	}
+	repos := []string{
+		fmt.Sprintf("deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ %s main restricted universe multiverse", codename),
+		fmt.Sprintf("deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ %s-updates main restricted universe multiverse", codename),
+		fmt.Sprintf("deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ %s-backports main restricted universe multiverse", codename),
+		fmt.Sprintf("deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ %s-security main restricted universe multiverse", codename),
+	}
+	if err := writeToFileViaSudo("/etc/apt/sources.list.d/amd64.list", strings.Join(repos, "\n")+"\n"); err != nil {
+		return fmt.Errorf("failed to add amd64 apt sources: %w", err)
+	}
 	return runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y")
 }
 

@@ -14,7 +14,7 @@ import (
 type LinuxProvisioner struct{}
 
 func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfig) error {
-	if err := runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y"); err != nil {
+	if err := aptUpdate(ctx); err != nil {
 		return fmt.Errorf("apt-get update failed: %w", err)
 	}
 
@@ -57,7 +57,7 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 			_ = writeToFileViaSudo("/etc/apt/trusted.gpg.d/pritunl.asc", string(gpgOut))
 		}
 
-		if err := runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y"); err != nil {
+		if err := aptUpdate(ctx); err != nil {
 			return fmt.Errorf("apt-get update after pritunl repo setup failed: %w", err)
 		}
 		pkgName := "pritunl-client"
@@ -121,7 +121,8 @@ func ensureMultiarch(ctx context.Context) error {
 	if err := writeToFileViaSudo("/etc/apt/sources.list.d/amd64.list", strings.Join(repos, "\n")+"\n"); err != nil {
 		return fmt.Errorf("failed to add amd64 apt sources: %w", err)
 	}
-	return runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y")
+	_ = aptUpdate(ctx)
+	return nil
 }
 
 func getLSBCodename(ctx context.Context) (string, error) {
@@ -144,6 +145,14 @@ func runCmd(ctx context.Context, name string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func aptUpdate(ctx context.Context) error {
+	err := runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y")
+	if err != nil && runtime.GOARCH == "arm64" {
+		return nil
+	}
+	return err
 }
 
 func getTempDir(cfg domain.ActionConfig) string {

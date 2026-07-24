@@ -94,10 +94,6 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 		}
 	}
 
-	if err := setupQemuUser(ctx); err != nil {
-		return fmt.Errorf("qemu-user-static setup failed: %w", err)
-	}
-
 	if _, err := exec.LookPath("pritunl-client"); err != nil {
 		return fmt.Errorf("pritunl-client not found in PATH after installation: %w", err)
 	}
@@ -157,17 +153,6 @@ func aptUpdate(ctx context.Context) error {
 		return nil
 	}
 	return err
-}
-
-func setupQemuUser(ctx context.Context) error {
-	if runtime.GOARCH != "arm64" {
-		return nil
-	}
-	if err := runCmd(ctx, "sudo", "apt-get", "install", "-qq", "-o=Dpkg::Use-Pty=0", "-y", "qemu-user-static"); err != nil {
-		return err
-	}
-	_ = runCmd(ctx, "sudo", "systemctl", "try-restart", "systemd-binfmt")
-	return nil
 }
 
 func getTempDir(cfg domain.ActionConfig) string {

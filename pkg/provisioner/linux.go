@@ -109,7 +109,7 @@ func provisionFromDocker(ctx context.Context, cfg domain.ActionConfig) error {
 
 	_ = runCmd(ctx, "docker", "rm", "-f", containerName)
 
-	if err := runCmd(ctx, "docker", "create", "--name", containerName, image); err != nil {
+	if err := runCmd(ctx, "docker", "create", "--name", containerName, "--entrypoint", "/pritunl-client", image); err != nil {
 		return err
 	}
 	defer runCmd(ctx, "docker", "rm", "-f", containerName)

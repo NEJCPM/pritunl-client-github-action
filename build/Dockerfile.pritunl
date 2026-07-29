@@ -1,0 +1,3 @@
+FROM scratch
+COPY pritunl-client /pritunl-client
+COPY pritunl-client-service /pritunl-client-service

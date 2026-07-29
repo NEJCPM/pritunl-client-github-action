@@ -11,10 +11,13 @@ import (
 	"github.com/nathanielvarona/pritunl-client-github-action/pkg/domain"
 )
 
+const defaultPritunlVersion = "1.3.4696.56"
+const pritunlImageRepo = "ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client"
+
 type LinuxProvisioner struct{}
 
 func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfig) error {
-	if err := aptUpdate(ctx); err != nil {
+	if err := runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y"); err != nil {
 		return fmt.Errorf("apt-get update failed: %w", err)
 	}
 
@@ -30,8 +33,8 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 		return fmt.Errorf("failed to install VPN dependencies: %w", err)
 	}
 
-	if err := ensureMultiarch(ctx); err != nil {
-		return fmt.Errorf("failed to configure multiarch: %w", err)
+	if runtime.GOARCH == "arm64" {
+		return provisionFromDocker(ctx, cfg)
 	}
 
 	if cfg.ClientVersion == "" || cfg.ClientVersion == "from-package-manager" {
@@ -57,14 +60,10 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 			_ = writeToFileViaSudo("/etc/apt/trusted.gpg.d/pritunl.asc", string(gpgOut))
 		}
 
-		if err := aptUpdate(ctx); err != nil {
+		if err := runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y"); err != nil {
 			return fmt.Errorf("apt-get update after pritunl repo setup failed: %w", err)
 		}
-		pkgName := "pritunl-client"
-		if runtime.GOARCH == "arm64" {
-			pkgName = "pritunl-client:amd64"
-		}
-		if err := runCmd(ctx, "sudo", "apt-get", "install", "-qq", "-o=Dpkg::Use-Pty=0", "-y", pkgName); err != nil {
+		if err := runCmd(ctx, "sudo", "apt-get", "install", "-qq", "-o=Dpkg::Use-Pty=0", "-y", "pritunl-client"); err != nil {
 			return fmt.Errorf("failed to install pritunl-client package: %w", err)
 		}
 	} else {
@@ -80,17 +79,8 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 		}
 		defer os.Remove(installFile)
 
-		if runtime.GOARCH == "arm64" {
-			if err := runCmd(ctx, "sudo", "dpkg", "-i", "--force-architecture", installFile); err != nil {
-				return fmt.Errorf("failed to install deb package %s: %w", installFile, err)
-			}
-			if err := runCmd(ctx, "sudo", "apt-get", "install", "-f", "-qq", "-y"); err != nil {
-				return fmt.Errorf("failed to fix dependencies after deb install: %w", err)
-			}
-		} else {
-			if err := runCmd(ctx, "sudo", "apt-get", "install", "-qq", "-o=Dpkg::Use-Pty=0", "-y", installFile); err != nil {
-				return fmt.Errorf("failed to install deb package %s: %w", installFile, err)
-			}
+		if err := runCmd(ctx, "sudo", "apt-get", "install", "-qq", "-o=Dpkg::Use-Pty=0", "-y", installFile); err != nil {
+			return fmt.Errorf("failed to install deb package %s: %w", installFile, err)
 		}
 	}
 
@@ -101,28 +91,61 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 	return nil
 }
 
-func ensureMultiarch(ctx context.Context) error {
-	if runtime.GOARCH != "arm64" {
-		return nil
+func resolveArm64Version(cfg domain.ActionConfig) string {
+	if cfg.ClientVersion == "" || cfg.ClientVersion == "from-package-manager" {
+		return defaultPritunlVersion
 	}
-	if err := runCmd(ctx, "sudo", "dpkg", "--add-architecture", "amd64"); err != nil {
+	return cfg.ClientVersion
+}
+
+func provisionFromDocker(ctx context.Context, cfg domain.ActionConfig) error {
+	version := resolveArm64Version(cfg)
+	image := pritunlImageRepo + ":" + version
+	containerName := "pritunl-extract"
+
+	if err := runCmd(ctx, "docker", "pull", image); err != nil {
+		return fmt.Errorf("failed to pull %s: %w", image, err)
+	}
+
+	_ = runCmd(ctx, "docker", "rm", "-f", containerName)
+
+	if err := runCmd(ctx, "docker", "create", "--name", containerName, image); err != nil {
 		return err
 	}
-	codename, err := getLSBCodename(ctx)
-	if err != nil {
-		codename = "noble"
+	defer runCmd(ctx, "docker", "rm", "-f", containerName)
+
+	if err := runCmd(ctx, "sudo", "docker", "cp", containerName+":/pritunl-client", "/usr/bin/pritunl-client"); err != nil {
+		return err
 	}
-	repos := []string{
-		fmt.Sprintf("deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ %s main restricted universe multiverse", codename),
-		fmt.Sprintf("deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ %s-updates main restricted universe multiverse", codename),
-		fmt.Sprintf("deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ %s-backports main restricted universe multiverse", codename),
-		fmt.Sprintf("deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ %s-security main restricted universe multiverse", codename),
+	if err := runCmd(ctx, "sudo", "docker", "cp", containerName+":/pritunl-client-service", "/usr/bin/pritunl-client-service"); err != nil {
+		return err
 	}
-	if err := writeToFileViaSudo("/etc/apt/sources.list.d/amd64.list", strings.Join(repos, "\n")+"\n"); err != nil {
-		return fmt.Errorf("failed to add amd64 apt sources: %w", err)
+	if err := runCmd(ctx, "sudo", "chmod", "+x", "/usr/bin/pritunl-client", "/usr/bin/pritunl-client-service"); err != nil {
+		return err
 	}
-	_ = aptUpdate(ctx)
-	return nil
+
+	return startPritunlService(ctx)
+}
+
+func startPritunlService(ctx context.Context) error {
+	unit := `[Unit]
+Description=Pritunl Client Daemon
+
+[Service]
+ExecStart=/usr/bin/pritunl-client-service
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+`
+	if err := writeToFileViaSudo("/etc/systemd/system/pritunl-client.service", unit); err != nil {
+		return err
+	}
+	if err := runCmd(ctx, "sudo", "systemctl", "daemon-reload"); err != nil {
+		return err
+	}
+	return runCmd(ctx, "sudo", "systemctl", "enable", "--now", "pritunl-client")
 }
 
 func getLSBCodename(ctx context.Context) (string, error) {
@@ -145,14 +168,6 @@ func runCmd(ctx context.Context, name string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
-}
-
-func aptUpdate(ctx context.Context) error {
-	err := runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y")
-	if err != nil && runtime.GOARCH == "arm64" {
-		return nil
-	}
-	return err
 }
 
 func getTempDir(cfg domain.ActionConfig) string {

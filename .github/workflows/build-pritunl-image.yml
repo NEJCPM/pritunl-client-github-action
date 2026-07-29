@@ -23,8 +23,8 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     outputs:
-      image_tag_amd64: ghcr.io/nejcpm/pritunl-client:${{ inputs.pritunl-version }}-amd64
-      image_tag_arm64: ghcr.io/nejcpm/pritunl-client:${{ inputs.pritunl-version }}-arm64
+      image_tag_amd64: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }}-amd64
+      image_tag_arm64: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }}-arm64
     steps:
       - uses: actions/checkout@v7.0.1
 
@@ -69,7 +69,7 @@ jobs:
           file: build/Dockerfile.pritunl
           platforms: linux/${{ matrix.arch }}
           push: true
-          tags: ghcr.io/nejcpm/pritunl-client:${{ inputs.pritunl-version }}-${{ matrix.arch }}
+          tags: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }}-${{ matrix.arch }}
 
   merge:
     needs: build
@@ -88,7 +88,7 @@ jobs:
       - name: Create multi-arch manifest
         run: |
           docker buildx imagetools create \
-            -t ghcr.io/nejcpm/pritunl-client:${{ inputs.pritunl-version }} \
-            -t ghcr.io/nejcpm/pritunl-client:latest \
-            ghcr.io/nejcpm/pritunl-client:${{ inputs.pritunl-version }}-amd64 \
-            ghcr.io/nejcpm/pritunl-client:${{ inputs.pritunl-version }}-arm64
+            -t ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }} \
+            -t ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:latest \
+            ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }}-amd64 \
+            ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }}-arm64

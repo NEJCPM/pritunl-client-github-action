@@ -32,14 +32,14 @@ Check the compatibility of various runners and VPN modes:
 
 Runner                                                                                                                   | OpenVPN                | WireGuard
 -------------------------------------------------------------------------------------------------------------------------|------------------------|------------------------
-`ubuntu-24.04` <sup>[:warning: beta](https://github.com/actions/runner-images?tab=readme-ov-file#available-images)</sup> | :white_check_mark: Yes | :construction: Unstable
+`ubuntu-24.04`                                                                                                           | :white_check_mark: Yes | :construction: Unstable
+`ubuntu-24.04-arm` <sup>[arm64](#supported-arm64-architecture-runners)</sup>                                             | :white_check_mark: Yes | :construction: Unstable
 `ubuntu-22.04`                                                                                                           | :white_check_mark: Yes | :white_check_mark: Yes
-`ubuntu-20.04`                                                                                                           | :white_check_mark: Yes | :white_check_mark: Yes
-`macos-14` <sup>[arm64](#supported-arm64-architecture-runners)</sup>                                                     | :white_check_mark: Yes | :construction: Unstable
+`macos-15` <sup>[arm64](#supported-arm64-architecture-runners)</sup>                                                    | :white_check_mark: Yes | :construction: Unstable
+`macos-14` <sup>[arm64](#supported-arm64-architecture-runners)</sup>                                                    | :white_check_mark: Yes | :construction: Unstable
 `macos-13`                                                                                                               | :white_check_mark: Yes | :white_check_mark: Yes
-`macos-12`                                                                                                               | :white_check_mark: Yes | :white_check_mark: Yes
+`windows-2025`                                                                                                           | :white_check_mark: Yes | :white_check_mark: Yes
 `windows-2022`                                                                                                           | :white_check_mark: Yes | :white_check_mark: Yes
-`windows-2019`                                                                                                           | :white_check_mark: Yes | :white_check_mark: Yes
 
 > [!TIP]
 > * See  the workflow file [connection-tests-complete.yml](./.github/workflows/connection-tests-complete.yml) for a complete tests matrix example.
@@ -397,7 +397,17 @@ Create a GitHub Action Secret (e.g., `PRITUNL_PROFILE_FILE`) and paste the entir
 
 ## Supported Arm64 Architecture Runners
 
-Supports GitHub Actions runners with Arm64 architecture, enabling users to run workflows on Arm64-based systems.
+Full support for GitHub Actions runners with **Arm64 architecture** (`ubuntu-24.04-arm`, `macos-14`, `macos-15`).
+
+### How Arm64 Linux Works
+Because official Pritunl repositories only package `i386` and `amd64` Linux binaries, this action seamlessly provision native **arm64** Pritunl Client binaries by extracting them from our public multi-arch container image:
+```text
+ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:<version>
+```
+The image contains statically linked native `aarch64` binaries built from the official [Pritunl Client source code](https://github.com/pritunl/pritunl-client-electron) on native Arm64 runners, requiring zero local compilation and avoiding QEMU emulation overhead.
+
+### How Arm64 macOS Works
+On macOS Apple Silicon (`macos-14`, `macos-15`), Pritunl Client is installed natively using Homebrew Cask or versioned `.pkg` downloads.
 
 > [!TIP]
 > See an example of Arm64 support in our [connection-tests-basic.yml](./.github/workflows/connection-tests-basic.yml) file.

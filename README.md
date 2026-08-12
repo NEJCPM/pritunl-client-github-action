@@ -392,7 +392,7 @@ Create a GitHub Action Secret (e.g., `PRITUNL_PROFILE_FILE`) and paste the entir
   }
   ```
 
-  _Check out this script ([pritunl-profile-encode.sh](https://github.com/nathanielvarona/dotfiles/blob/master/.scripts/source/pritunl-profile-encode.sh)) from [nathanielvarona/dotfiles](https://github.com/nathanielvarona/dotfiles) for an example of how to implement one-liner shorthand script._
+  _See the [profile encoding instructions](#working-with-pritunl-profile-file) above for an example of how to prepare a profile for GitHub Actions._
 </details>
 
 ## Supported Arm64 Architecture Runners

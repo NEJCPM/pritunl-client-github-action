@@ -7,6 +7,11 @@ services:
       MONGO_INITDB_DATABASE: pritunl
     volumes:
       - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   pritunl:
     build:
@@ -25,7 +30,14 @@ services:
       - "443:443/tcp"
       - "1194:1194/udp"
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-kfsS", "https://localhost:443/" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 30
 
 volumes:
   mongo-data:

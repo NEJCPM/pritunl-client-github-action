@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/domain"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
 // PlatformProvisioner handles OS package manager installation of Pritunl Client and dependencies.

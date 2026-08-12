@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/domain"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
 // MockCLI is an in-memory test adapter implementing PritunlCLI.

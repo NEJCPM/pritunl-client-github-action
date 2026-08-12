@@ -3,7 +3,7 @@ package cli
 import (
 	"context"
 
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/domain"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
 // PritunlCLI defines the seam for interacting with the pritunl-client binary.

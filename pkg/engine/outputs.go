@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/domain"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
 // WriteActionOutputs writes client-id and client-ids to GitHub Actions output file ($GITHUB_OUTPUT).

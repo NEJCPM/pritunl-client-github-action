@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/domain"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
 // SystemCLI implements PritunlCLI by executing the real pritunl-client binary.

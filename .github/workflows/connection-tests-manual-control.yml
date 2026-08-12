@@ -21,7 +21,7 @@ jobs:
 
       - name: Setup Pritunl Profile
         id: pritunl-connection # A `Setup Step ID` has been added as a reference identifier for the output `client-id`.
-        uses: ./ # Use `nathanielvarona/pritunl-client-github-action@v1` for your GitHub Action workflow.
+        uses: ./ # Use `NEJCPM/pritunl-client-github-action@v1` for your GitHub Action workflow.
         with:
           profile-file: ${{ secrets.PRITUNL_PROFILE_FILE }}
           start-connection: false # Do not establish a connection in this step.

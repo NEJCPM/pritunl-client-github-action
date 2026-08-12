@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/cli"
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/domain"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/cli"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
 func createDummyTarBase64() string {

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/cli"
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/engine"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/cli"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/engine"
 )
 
 func TestE2E_DockerComposePritunlConnection(t *testing.T) {

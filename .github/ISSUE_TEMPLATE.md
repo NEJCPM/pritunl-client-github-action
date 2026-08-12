@@ -66,7 +66,7 @@
 ```yml
   - name: Setup Pritunl Profile
       id: pritunl-connection
-      uses: nathanielvarona/pritunl-client-github-action@v1
+      uses: NEJCPM/pritunl-client-github-action@v1
       with:
       profile-file: ${{ secrets.PRITUNL_PROFILE_FILE }}
       profile-pin: ${{ secrets.PRITUNL_PROFILE_PIN }}

@@ -20,10 +20,10 @@ Streamline tasks such as:
 
 ## Connection Tests
 
-[![Connection Tests - Basic](https://github.com/nathanielvarona/pritunl-client-github-action/actions/workflows/connection-tests-basic.yml/badge.svg?branch=main)](https://github.com/nathanielvarona/pritunl-client-github-action/actions/workflows/connection-tests-basic.yml?query=branch:main)
-[![Connection Tests - Complete](https://github.com/nathanielvarona/pritunl-client-github-action/actions/workflows/connection-tests-complete.yml/badge.svg?branch=main)](https://github.com/nathanielvarona/pritunl-client-github-action/actions/workflows/connection-tests-complete.yml?query=branch:main)
-[![Connection Tests - Manual Control](https://github.com/nathanielvarona/pritunl-client-github-action/actions/workflows/connection-tests-manual-control.yml/badge.svg?branch=main)](https://github.com/nathanielvarona/pritunl-client-github-action/actions/workflows/connection-tests-manual-control.yml?query=branch:main)
-[![Connection Tests - Multi Server Profile](https://github.com/nathanielvarona/pritunl-client-github-action/actions/workflows/connection-tests-multi-server-profile.yml/badge.svg?branch=main)](https://github.com/nathanielvarona/pritunl-client-github-action/actions/workflows/connection-tests-multi-server-profile.yml?query=branch:main)
+[![Connection Tests - Basic](https://github.com/NEJCPM/pritunl-client-github-action/actions/workflows/connection-tests-basic.yml/badge.svg?branch=main)](https://github.com/NEJCPM/pritunl-client-github-action/actions/workflows/connection-tests-basic.yml?query=branch:main)
+[![Connection Tests - Complete](https://github.com/NEJCPM/pritunl-client-github-action/actions/workflows/connection-tests-complete.yml/badge.svg?branch=main)](https://github.com/NEJCPM/pritunl-client-github-action/actions/workflows/connection-tests-complete.yml?query=branch:main)
+[![Connection Tests - Manual Control](https://github.com/NEJCPM/pritunl-client-github-action/actions/workflows/connection-tests-manual-control.yml/badge.svg?branch=main)](https://github.com/NEJCPM/pritunl-client-github-action/actions/workflows/connection-tests-manual-control.yml?query=branch:main)
+[![Connection Tests - Multi Server Profile](https://github.com/NEJCPM/pritunl-client-github-action/actions/workflows/connection-tests-multi-server-profile.yml/badge.svg?branch=main)](https://github.com/NEJCPM/pritunl-client-github-action/actions/workflows/connection-tests-multi-server-profile.yml?query=branch:main)
 
 
 ### Compatibility Matrix
@@ -43,7 +43,7 @@ Runner                                                                          
 
 > [!TIP]
 > * See  the workflow file [connection-tests-complete.yml](./.github/workflows/connection-tests-complete.yml) for a complete tests matrix example.
-> * View the comprehensive connection tests matrix on our [GitHub Actions](https://github.com/nathanielvarona/pritunl-client-github-action/actions) page for more details.
+> * View the comprehensive connection tests matrix on our [GitHub Actions](https://github.com/NEJCPM/pritunl-client-github-action/actions) page for more details.
 
 ### Confirmed Compatibility
 We have confirmed compatibility with [Pritunl v1.32.3805.95](https://github.com/pritunl/pritunl/releases/tag/1.32.3805.95) and later versions through rigorous testing. Our server clusters are deployed across multiple cloud platforms, including [AWS](https://aws.amazon.com/), [Azure](https://azure.microsoft.com/) and [Linode (Akamai)](https://www.linode.com/).
@@ -59,7 +59,7 @@ Provides input parameters for the **Pritunl Client GitHub Action**, allowing use
 
 ```yaml
 - name: Pritunl Client GitHub Action
-  uses: nathanielvarona/pritunl-client-github-action@v1
+  uses: NEJCPM/pritunl-client-github-action@v1
   with:
     profile-file: ''
       # REQUIRED: Pritunl Profile File (Base64 text format)
@@ -159,7 +159,7 @@ Establish a VPN connection with just a few lines of code! Simply set the require
 
 ```yml
 - name: Setup Pritunl Profile and Start VPN Connection
-  uses: nathanielvarona/pritunl-client-github-action@v1
+  uses: NEJCPM/pritunl-client-github-action@v1
   with:
     profile-file: ${{ secrets.PRITUNL_PROFILE_FILE }}
 ```
@@ -173,7 +173,7 @@ If your VPN connection requires authentication, use the `profile-pin` input to p
 
 ```yml
 - name: Setup Pritunl Profile and Start VPN Connection
-  uses: nathanielvarona/pritunl-client-github-action@v1
+  uses: NEJCPM/pritunl-client-github-action@v1
   with:
     profile-file: ${{ secrets.PRITUNL_PROFILE_FILE }}
     profile-pin: ${{ secrets.PRITUNL_PROFILE_PIN }}
@@ -190,7 +190,7 @@ Select one or more servers by specifying their names. You can use:
 
 ```yml
 - name: Setup Pritunl Profile and Start VPN Connection
-  uses: nathanielvarona/pritunl-client-github-action@v1
+  uses: NEJCPM/pritunl-client-github-action@v1
   with:
     profile-file: ${{ secrets.PRITUNL_PROFILE_FILE }}
 
@@ -216,7 +216,7 @@ Use a specific version of the Pritunl client.
 
 ```yml
 - name: Setup Pritunl Profile and Start VPN Connection
-  uses: nathanielvarona/pritunl-client-github-action@v1
+  uses: NEJCPM/pritunl-client-github-action@v1
   with:
     profile-file: ${{ secrets.PRITUNL_PROFILE_FILE }}
     client-version: 1.3.3883.60
@@ -228,7 +228,7 @@ Use a specific VPN mode (e.g., **WireGuard**).
 
 ```yml
 - name: Setup Pritunl Profile and Start VPN Connection
-  uses: nathanielvarona/pritunl-client-github-action@v1
+  uses: NEJCPM/pritunl-client-github-action@v1
   with:
     profile-file: ${{ secrets.PRITUNL_PROFILE_FILE }}
     vpn-mode: wg
@@ -242,7 +242,7 @@ Demonstrates manual control over the VPN connection, including starting, stoppin
 # Set up Pritunl profile and store client ID for later use
 - name: Setup Pritunl Profile
   id: pritunl-connection # A `Setup Step ID` has been added as a reference identifier for the output `client-id`.
-  uses: nathanielvarona/pritunl-client-github-action@v1
+  uses: NEJCPM/pritunl-client-github-action@v1
   with:
     profile-file: ${{ secrets.PRITUNL_PROFILE_FILE }}
     start-connection: false # Do not establish a connection in this step.
@@ -282,7 +282,7 @@ By default, step outputs are hidden in the GitHub Actions log to keep it clean a
 
 ```yml
 - name: Setup Pritunl Profile and Start VPN Connection
-  uses: nathanielvarona/pritunl-client-github-action@v1
+  uses: NEJCPM/pritunl-client-github-action@v1
   with:
     profile-file: ${{ secrets.PRITUNL_PROFILE_FILE }}
     concealed-outputs: false # Set to false to reveal step outputs in the GitHub Actions log
@@ -422,7 +422,7 @@ For details on runner billing, please refer to the "[About billing for GitHub Ac
 ### Pritunl Client Installation
   - **Affected Runners:** **Ubuntu (Linux) Runners** using the `Apt Repository` for installation.
 
-  - **Related Issues:** [#209](https://github.com/nathanielvarona/pritunl-client-github-action/issues/209), [#206](https://github.com/nathanielvarona/pritunl-client-github-action/issues/206)
+  - **Related Issues:** [#209](https://github.com/NEJCPM/pritunl-client-github-action/issues/209), [#206](https://github.com/NEJCPM/pritunl-client-github-action/issues/206)
 
   - **Problems:**
     - Occasionally, updates to the Pritunl Client package in the Ubuntu repository can cause installation issues.
@@ -436,7 +436,7 @@ For details on runner billing, please refer to the "[About billing for GitHub Ac
       _Example:_
 
       ```yml
-      - uses: nathanielvarona/pritunl-client-github-action@v1
+      - uses: NEJCPM/pritunl-client-github-action@v1
         ...
         with:
           ...
@@ -525,10 +525,10 @@ Thank you again for your contribution! If you have any questions or concerns, fe
 
 ## Star History
 
-<a href="https://star-history.com/#nathanielvarona/pritunl-client-github-action&Date">
+<a href="https://star-history.com/#NEJCPM/pritunl-client-github-action&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nathanielvarona/pritunl-client-github-action&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nathanielvarona/pritunl-client-github-action&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=nathanielvarona/pritunl-client-github-action&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=NEJCPM/pritunl-client-github-action&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=NEJCPM/pritunl-client-github-action&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=NEJCPM/pritunl-client-github-action&type=Date" />
  </picture>
 </a>

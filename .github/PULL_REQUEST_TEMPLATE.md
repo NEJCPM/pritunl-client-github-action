@@ -5,7 +5,7 @@
 
 <!-- ### Related Issues -->
 <!-- Please provide the links of related issues: -->
-<!-- https://github.com/nathanielvarona/pritunl-client-github-action/issues/[ISSUE NUMBER] -->
+<!-- https://github.com/NEJCPM/pritunl-client-github-action/issues/[ISSUE NUMBER] -->
 
 <!-- ### Motivation and Context -->
 <!-- Why is this change required? What problem does it solve? -->

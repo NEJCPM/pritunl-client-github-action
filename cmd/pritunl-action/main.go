@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/cli"
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/domain"
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/engine"
-	"github.com/nathanielvarona/pritunl-client-github-action/pkg/provisioner"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/cli"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/engine"
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/provisioner"
 )
 
 func main() {

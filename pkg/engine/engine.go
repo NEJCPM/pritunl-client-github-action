@@ -30,6 +30,10 @@ func NewEngine(cliAdapter cli.PritunlCLI) *Engine {
 	}
 }
 
+// maxProfileBase64Bytes caps the accepted size of the base64-encoded profile
+// input to avoid unbounded memory and disk consumption from oversized inputs.
+var maxProfileBase64Bytes int64 = 32 << 20 // 32 MiB of base64 (~24 MiB decoded)
+
 // Connect performs the entire VPN setup and connection lifecycle.
 func (e *Engine) Connect(ctx context.Context, cfg domain.ActionConfig) (*domain.ConnectionResult, error) {
 	// 1. Decode base64 profile and validate archive format
@@ -49,6 +53,8 @@ func (e *Engine) Connect(ctx context.Context, cfg domain.ActionConfig) (*domain.
 	if err != nil {
 		return nil, fmt.Errorf("waiting for ready profile servers failed: %w", err)
 	}
+
+	targetServers = dedupeServersByID(targetServers)
 
 	// Sort target servers by name for deterministic primary client-id determination
 	sort.Slice(targetServers, func(i, j int) bool {
@@ -87,7 +93,7 @@ func (e *Engine) Connect(ctx context.Context, cfg domain.ActionConfig) (*domain.
 		if err := e.cli.StartConnection(ctx, s.ID, cfg.VPNMode, cfg.ProfilePin); err != nil {
 			return nil, fmt.Errorf("failed to start connection for server %s (%s): %w", s.Name, s.ID, err)
 		}
-		time.Sleep(500 * time.Millisecond)
+		sleepCtx(ctx, 500*time.Millisecond)
 	}
 
 	// 7. Poll until connection is established or timeout is reached
@@ -110,12 +116,16 @@ func (e *Engine) decodeAndValidateProfile(b64Data string, tempDir string) (strin
 		return "", errors.New("profile-file input is empty")
 	}
 
+	if int64(len(b64Data)) > maxProfileBase64Bytes {
+		return "", fmt.Errorf("profile-file input exceeds maximum allowed size (%d bytes of base64)", maxProfileBase64Bytes)
+	}
+
 	decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(b64Data))
 	if err != nil {
 		return "", fmt.Errorf("invalid base64 profile encoding: %w", err)
 	}
 
-	// Validate tar header signature
+	// Validate tar header signature and reject path-traversal entries
 	if !isTarArchive(decoded) {
 		return "", errors.New("decoded profile file is not a valid tar archive")
 	}
@@ -124,8 +134,19 @@ func (e *Engine) decodeAndValidateProfile(b64Data string, tempDir string) (strin
 		tempDir = os.TempDir()
 	}
 
-	outPath := filepath.Join(tempDir, fmt.Sprintf("profile-file-%d.tar", time.Now().UnixNano()))
-	if err := os.WriteFile(outPath, decoded, 0600); err != nil {
+	f, err := os.CreateTemp(tempDir, "profile-file-*.tar")
+	if err != nil {
+		return "", fmt.Errorf("failed to create decoded profile tarball: %w", err)
+	}
+	outPath := f.Name()
+
+	if _, err := f.Write(decoded); err != nil {
+		f.Close()
+		os.Remove(outPath)
+		return "", fmt.Errorf("failed to write decoded profile tarball: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(outPath)
 		return "", fmt.Errorf("failed to write decoded profile tarball: %w", err)
 	}
 
@@ -134,8 +155,45 @@ func (e *Engine) decodeAndValidateProfile(b64Data string, tempDir string) (strin
 
 func isTarArchive(data []byte) bool {
 	tr := tar.NewReader(bytes.NewReader(data))
-	_, err := tr.Next()
-	return err == nil
+	hdr, err := tr.Next()
+	if err != nil {
+		return false
+	}
+	// Reject archive entries with absolute paths or traversal components.
+	name := hdr.Name
+	if strings.HasPrefix(name, "/") {
+		return false
+	}
+	for _, part := range strings.Split(filepath.ToSlash(name), "/") {
+		if part == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+// dedupeServersByID removes repeated servers (same ID) while preserving order.
+func dedupeServersByID(servers []domain.ProfileServer) []domain.ProfileServer {
+	seen := make(map[string]bool, len(servers))
+	out := servers[:0]
+	for _, s := range servers {
+		if seen[s.ID] {
+			continue
+		}
+		seen[s.ID] = true
+		out = append(out, s)
+	}
+	return out
+}
+
+// sleepCtx sleeps for d but returns immediately when ctx is cancelled.
+func sleepCtx(ctx context.Context, d time.Duration) {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+	case <-t.C:
+	}
 }
 
 func (e *Engine) waitForReadyServers(ctx context.Context, cfg domain.ActionConfig) ([]domain.ProfileServer, error) {

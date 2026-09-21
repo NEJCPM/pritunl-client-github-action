@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
@@ -23,7 +22,9 @@ func NewWindowsProvisioner() *WindowsProvisioner {
 
 func (w *WindowsProvisioner) Provision(ctx context.Context, cfg domain.ActionConfig) error {
 	if cfg.VPNMode == "wg" {
-		_ = w.run(ctx, "choco", "install", "--no-progress", "-y", "wireguard")
+		if err := w.run(ctx, "choco", "install", "--no-progress", "-y", "wireguard"); err != nil {
+			return fmt.Errorf("failed to install wireguard via choco: %w", err)
+		}
 	}
 
 	if cfg.ClientVersion == "" || cfg.ClientVersion == "from-package-manager" {
@@ -32,9 +33,12 @@ func (w *WindowsProvisioner) Provision(ctx context.Context, cfg domain.ActionCon
 		}
 	} else {
 		exeURL := fmt.Sprintf("https://github.com/pritunl/pritunl-client-electron/releases/download/%s/Pritunl.exe", cfg.ClientVersion)
-		exeFile := filepath.Join(getTempDir(cfg), "Pritunl.exe")
+		exeFile, err := createTempFile(getTempDir(cfg), "Pritunl-*.exe")
+		if err != nil {
+			return fmt.Errorf("failed to create temp file for Pritunl.exe: %w", err)
+		}
 
-		if err := w.run(ctx, "curl", "-sSL", exeURL, "-o", exeFile); err != nil {
+		if err := w.run(ctx, "curl", "-fsSL", exeURL, "-o", exeFile); err != nil {
 			return fmt.Errorf("failed to download Pritunl.exe from %s: %w", exeURL, err)
 		}
 		defer os.Remove(exeFile)

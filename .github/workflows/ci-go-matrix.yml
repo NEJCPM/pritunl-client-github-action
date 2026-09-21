@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main, v1 ]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: "go-ci (${{ matrix.os }})"
@@ -16,25 +19,48 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Go
-        uses: actions/setup-go@v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.5'
 
       - name: Verify Build
         run: go build -v ./cmd/pritunl-action
 
-      - name: Run Unit Tests with Coverage
-        run: go test ./pkg/... -covermode=atomic -coverprofile=coverage.out
+      - name: Vet
+        run: go vet ./...
+
+      - name: Run Unit Tests
+        run: go test ./pkg/...
+
+      - name: Run Unit Tests with Race Detector and Coverage
+        if: runner.os == 'Linux'
+        run: go test ./pkg/... -race -covermode=atomic -coverprofile=coverage.out
 
       - name: Report Coverage
+        if: runner.os == 'Linux'
         run: go tool cover -func=coverage.out
 
       - name: Upload Coverage Artifact
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage
           path: coverage.out
+
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.5'
+
+      - name: Run govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

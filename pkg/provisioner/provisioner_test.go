@@ -67,9 +67,12 @@ func (f *fakeRunner) joined() string {
 
 func fakeLinux(l *LinuxProvisioner, runner *fakeRunner) {
 	l.run = runner.run
+	l.showKeys = func(context.Context, string) (string, error) {
+		return "fpr:::::::::" + expectedPritunlKeyFingerprint, nil
+	}
 	l.lsbCodename = func(context.Context) (string, error) { return "jammy", nil }
 	l.lookPath = func(string) (string, error) { return "/usr/bin/pritunl-client", nil }
-	l.writeFile = func(string, string) error { return nil }
+	l.writeFile = func(context.Context, string, string) error { return nil }
 	l.goArch = "amd64"
 }
 
@@ -156,7 +159,7 @@ func TestLinuxProvisioner_RepoLine_ContainsSignedByAndCodename(t *testing.T) {
 	l := newTestLinux(runner)
 
 	var writtenPath, writtenContent string
-	l.writeFile = func(path string, content string) error {
+	l.writeFile = func(_ context.Context, path string, content string) error {
 		writtenPath, writtenContent = path, content
 		return nil
 	}
@@ -183,7 +186,7 @@ func TestLinuxProvisioner_LSBFailure_FallsBackToNoble(t *testing.T) {
 	l.lsbCodename = func(context.Context) (string, error) { return "", fmt.Errorf("not found") }
 
 	var writtenContent string
-	l.writeFile = func(_ string, content string) error {
+	l.writeFile = func(_ context.Context, _ string, content string) error {
 		writtenContent = content
 		return nil
 	}
@@ -260,7 +263,7 @@ func TestLinuxProvisioner_CommandFailures_Propagate(t *testing.T) {
 func TestLinuxProvisioner_WriteRepoFailure_Propagates(t *testing.T) {
 	runner := newFakeRunner()
 	l := newTestLinux(runner)
-	l.writeFile = func(string, string) error { return fmt.Errorf("disk full") }
+	l.writeFile = func(context.Context, string, string) error { return fmt.Errorf("disk full") }
 
 	err := l.Provision(context.Background(), domain.ActionConfig{RunnerTemp: t.TempDir()})
 	if err == nil || !strings.Contains(err.Error(), "failed to configure pritunl apt repository") {
@@ -285,7 +288,7 @@ func TestLinuxProvisioner_Arm64_UsesDockerFlow(t *testing.T) {
 	l.goArch = "arm64"
 
 	var unitContent string
-	l.writeFile = func(path string, content string) error {
+	l.writeFile = func(_ context.Context, path string, content string) error {
 		if strings.Contains(path, "systemd") {
 			unitContent = content
 		}
@@ -304,7 +307,7 @@ func TestLinuxProvisioner_Arm64_UsesDockerFlow(t *testing.T) {
 	if !strings.Contains(script, "--entrypoint /pritunl-client") {
 		t.Error("expected docker create with entrypoint")
 	}
-	if !strings.Contains(script, "docker cp pritunl-extract:/pritunl-client") {
+	if !strings.Contains(script, "docker cp pritunl-extract-") {
 		t.Error("expected binary extraction")
 	}
 	if !strings.Contains(script, "systemctl enable --now pritunl-client") {

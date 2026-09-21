@@ -3,6 +3,9 @@ name: Connection Tests - Multi Server Profile
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   connection-tests:
     strategy:
@@ -21,7 +24,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1 # Checkout the code to run tests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 # Checkout the code to run tests
 
       - name: Setup Pritunl Profile
         id: pritunl-connection

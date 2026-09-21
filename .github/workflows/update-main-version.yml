@@ -14,18 +14,35 @@ on:
         options:
           - v1
 
+permissions:
+  contents: write
+
 jobs:
   tag:
     runs-on: ubuntu-24.04
+    env:
+      TARGET: ${{ github.event.inputs.target }}
+      MAJOR_VERSION: ${{ github.event.inputs.major_version }}
     steps:
-    - uses: actions/checkout@v7.0.1
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         fetch-depth: 0
     - name: Git config
       run: |
         git config user.name github-actions
         git config user.email github-actions@github.com
+    - name: Validate target is a SemVer tag
+      run: |
+        set -euo pipefail
+        if [[ ! "$TARGET" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Target '$TARGET' is not a valid SemVer tag (expected vMAJOR.MINOR.PATCH)" >&2
+          exit 1
+        fi
+        git rev-parse --verify --quiet "refs/tags/$TARGET" >/dev/null || {
+          echo "::error::Tag '$TARGET' does not exist in this repository" >&2
+          exit 1
+        }
     - name: Tag new target
-      run: git tag -f ${{ github.event.inputs.major_version }} ${{ github.event.inputs.target }}
+      run: git tag -f "$MAJOR_VERSION" "$TARGET"
     - name: Push new tag
-      run: git push origin ${{ github.event.inputs.major_version }} --force
+      run: git push origin "$MAJOR_VERSION" --force

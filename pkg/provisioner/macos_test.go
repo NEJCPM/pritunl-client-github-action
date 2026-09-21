@@ -99,3 +99,15 @@ func TestMacOSProvisioner_CommandFailures_Propagate(t *testing.T) {
 		})
 	}
 }
+
+func TestMacOSProvisioner_WireGuardFailure_Propagates(t *testing.T) {
+	runner := newFakeRunner()
+	runner.errFor["brew"] = errBoom
+	m := newTestMacOS(runner)
+	t.Setenv("HOME", t.TempDir())
+
+	err := m.Provision(context.Background(), domain.ActionConfig{VPNMode: "wg", RunnerTemp: t.TempDir()})
+	if err == nil || !strings.Contains(err.Error(), "failed to install wireguard-tools via brew") {
+		t.Fatalf("expected wireguard-tools failure, got: %v", err)
+	}
+}

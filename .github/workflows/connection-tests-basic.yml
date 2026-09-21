@@ -3,6 +3,9 @@ name: Connection Tests - Basic
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   connection-tests:
     strategy:
@@ -20,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1 # Checkout the code to run tests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 # Checkout the code to run tests
 
       - name: Setup Pritunl Profile
         id: pritunl-connection
@@ -76,10 +79,14 @@ jobs:
           profile_ip=$(pritunl-client list -j | jq ". | sort_by(.name)" | jq ".[0]" | jq -r ".client_address")
 
           # Get the VPN gateway IP
-          vpn_gateway="$(ipcalc $profile_ip | awk 'NR==6{print $2}')"
+          vpn_gateway="$(ipcalc "$profile_ip" | awk 'NR==6{print $2}')"
 
-          # Set the ping flags based on the runner OS
-          ping_flags="$([[ "$RUNNER_OS" == "Windows" ]] && echo "-n $ping_count_number" || echo "-c $ping_count_number")"
+          # Set the ping flags based on the runner OS (array keeps args quoted)
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            ping_args=(-n "$ping_count_number")
+          else
+            ping_args=(-c "$ping_count_number")
+          fi
 
           # Ping the VPN gateway
-          ping $vpn_gateway $ping_flags
+          ping "${ping_args[@]}" "$vpn_gateway"

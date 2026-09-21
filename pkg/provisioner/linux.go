@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -15,14 +16,23 @@ const defaultPritunlVersion = "1.3.4696.56"
 const pritunlImageRepo = "ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client"
 const pritunlGPGKeyURL = "https://raw.githubusercontent.com/pritunl/pgp/master/pritunl_repo_pub.asc"
 
+// expectedPritunlKeyFingerprint is the official Pritunl repository signing
+// key fingerprint. The downloaded key file must contain it.
+const expectedPritunlKeyFingerprint = "7568D9BB55FF9E5287D586017AE645C0CF8E292A"
+
+// validCodenamePattern restricts apt distro codenames to safe values so a
+// misbehaving lsb_release cannot corrupt the sources list.
+var validCodenamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*$`)
+
 // LinuxProvisioner installs the Pritunl client on Debian-based runners.
 // Command execution, privileged file writes, LSB detection and PATH lookup are
 // injectable seams so unit tests never run real system commands.
 type LinuxProvisioner struct {
 	run         commandRunner
+	showKeys    func(ctx context.Context, keyFile string) (string, error)
 	lsbCodename func(ctx context.Context) (string, error)
 	lookPath    func(string) (string, error)
-	writeFile   func(filePath string, content string) error
+	writeFile   func(ctx context.Context, filePath string, content string) error
 	goArch      string
 }
 
@@ -30,6 +40,7 @@ type LinuxProvisioner struct {
 func NewLinuxProvisioner() *LinuxProvisioner {
 	return &LinuxProvisioner{
 		run:         runCmd,
+		showKeys:    showKeyFingerprints,
 		lsbCodename: getLSBCodename,
 		lookPath:    exec.LookPath,
 		writeFile:   writeToFileViaSudo,
@@ -67,6 +78,9 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 		if err != nil {
 			distroCodename = "noble"
 		}
+		if !validCodenamePattern.MatchString(distroCodename) {
+			return fmt.Errorf("detected invalid distro codename %q; refusing to configure apt repository", distroCodename)
+		}
 
 		keyFile := fmt.Sprintf("%s/pritunl_repo_pub.asc", getTempDir(cfg))
 		if err := l.run(ctx, "curl", "-fsSL", pritunlGPGKeyURL, "-o", keyFile); err != nil {
@@ -74,12 +88,20 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 		}
 		defer os.Remove(keyFile)
 
+		keyOut, keyErr := l.showKeys(ctx, keyFile)
+		if keyErr != nil {
+			return fmt.Errorf("failed to inspect downloaded pritunl GPG key: %w", keyErr)
+		}
+		if !strings.Contains(keyOut, expectedPritunlKeyFingerprint) {
+			return fmt.Errorf("downloaded pritunl GPG key does not match expected fingerprint %s; aborting repository setup", expectedPritunlKeyFingerprint)
+		}
+
 		if err := l.run(ctx, "sudo", "gpg", "--dearmor", "--yes", "-o", "/usr/share/keyrings/pritunl.gpg", keyFile); err != nil {
 			return fmt.Errorf("failed to install pritunl repository GPG keyring: %w", err)
 		}
 
 		repoLine := fmt.Sprintf("deb [ signed-by=/usr/share/keyrings/pritunl.gpg ] https://repo.pritunl.com/stable/apt %s main", distroCodename)
-		if err := l.writeFile("/etc/apt/sources.list.d/pritunl.list", repoLine); err != nil {
+		if err := l.writeFile(ctx, "/etc/apt/sources.list.d/pritunl.list", repoLine); err != nil {
 			return fmt.Errorf("failed to configure pritunl apt repository: %w", err)
 		}
 
@@ -94,10 +116,13 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 		if err != nil {
 			distroCodename = "noble"
 		}
+		if !validCodenamePattern.MatchString(distroCodename) {
+			return fmt.Errorf("detected invalid distro codename %q; refusing to download distro-specific deb package", distroCodename)
+		}
 		debURL := fmt.Sprintf("https://github.com/pritunl/pritunl-client-electron/releases/download/%s/pritunl-client_%s-0ubuntu1.%s_amd64.deb", cfg.ClientVersion, cfg.ClientVersion, distroCodename)
 		installFile := fmt.Sprintf("%s/pritunl-client.deb", getTempDir(cfg))
 
-		if err := l.run(ctx, "curl", "-sSL", debURL, "-o", installFile); err != nil {
+		if err := l.run(ctx, "curl", "-fsSL", debURL, "-o", installFile); err != nil {
 			return fmt.Errorf("failed to download deb package from %s: %w", debURL, err)
 		}
 		defer os.Remove(installFile)
@@ -124,7 +149,9 @@ func resolveArm64Version(cfg domain.ActionConfig) string {
 func (l *LinuxProvisioner) provisionFromDocker(ctx context.Context, cfg domain.ActionConfig) error {
 	version := resolveArm64Version(cfg)
 	image := pritunlImageRepo + ":" + version
-	containerName := "pritunl-extract"
+	// Unique container name prevents collisions between concurrent jobs on
+	// self-hosted runners.
+	containerName := fmt.Sprintf("pritunl-extract-%d", os.Getpid())
 
 	if err := l.run(ctx, "docker", "pull", image); err != nil {
 		return fmt.Errorf("failed to pull %s: %w", image, err)
@@ -162,7 +189,7 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 `
-	if err := l.writeFile("/etc/systemd/system/pritunl-client.service", unit); err != nil {
+	if err := l.writeFile(ctx, "/etc/systemd/system/pritunl-client.service", unit); err != nil {
 		return err
 	}
 	if err := l.run(ctx, "sudo", "systemctl", "daemon-reload"); err != nil {
@@ -180,8 +207,19 @@ func getLSBCodename(ctx context.Context) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func writeToFileViaSudo(filePath string, content string) error {
-	cmd := exec.Command("sudo", "tee", filePath)
+// showKeyFingerprints runs gpg --show-keys on the downloaded key file and
+// returns its colonized output for fingerprint validation.
+func showKeyFingerprints(ctx context.Context, keyFile string) (string, error) {
+	cmd := exec.CommandContext(ctx, "gpg", "--show-keys", "--with-colons", keyFile)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+func writeToFileViaSudo(ctx context.Context, filePath string, content string) error {
+	cmd := exec.CommandContext(ctx, "sudo", "tee", filePath)
 	cmd.Stdin = strings.NewReader(content)
 	return cmd.Run()
 }
@@ -198,4 +236,17 @@ func getTempDir(cfg domain.ActionConfig) string {
 		return cfg.RunnerTemp
 	}
 	return os.TempDir()
+}
+
+// createTempFile creates a uniquely named empty file under dir. On failure it
+// returns an empty path so callers treat the whole operation as failed.
+func createTempFile(dir string, pattern string) (string, error) {
+	f, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		return "", err
+	}
+	return f.Name(), nil
 }

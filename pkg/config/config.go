@@ -11,6 +11,12 @@ import (
 	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
+// Timeout bounds prevent misconfigured workflows from hanging jobs for hours.
+const (
+	maxReadyProfileTimeoutSecs          = 300
+	maxEstablishedConnectionTimeoutSecs = 900
+)
+
 // LoadFromEnv builds an ActionConfig from the standard action environment
 // variables, applying defaults and normalization to every input.
 func LoadFromEnv() domain.ActionConfig {
@@ -33,8 +39,8 @@ func LoadFromEnv() domain.ActionConfig {
 		VPNMode:                      NormalizeMode(os.Getenv("PRITUNL_VPN_MODE")),
 		ClientVersion:                os.Getenv("PRITUNL_CLIENT_VERSION"),
 		StartConnection:              ParseBool(os.Getenv("PRITUNL_START_CONNECTION"), true),
-		ReadyProfileTimeout:          ParseInt(os.Getenv("PRITUNL_READY_PROFILE_TIMEOUT"), 3),
-		EstablishedConnectionTimeout: ParseInt(os.Getenv("PRITUNL_ESTABLISHED_CONNECTION_TIMEOUT"), 30),
+		ReadyProfileTimeout:          ClampInt(ParseInt(os.Getenv("PRITUNL_READY_PROFILE_TIMEOUT"), 3), 3, maxReadyProfileTimeoutSecs),
+		EstablishedConnectionTimeout: ClampInt(ParseInt(os.Getenv("PRITUNL_ESTABLISHED_CONNECTION_TIMEOUT"), 30), 30, maxEstablishedConnectionTimeoutSecs),
 		ConcealedOutputs:             ParseBool(os.Getenv("PRITUNL_CONCEALED_OUTPUTS"), true),
 		RunnerOS:                     runnerOS,
 		RunnerTemp:                   os.Getenv("RUNNER_TEMP"),
@@ -81,4 +87,16 @@ func ParseInt(val string, defaultValue int) int {
 		return defaultValue
 	}
 	return i
+}
+
+// ClampInt bounds val between 1 and max, returning def when val is not
+// positive. Used for timeout inputs to keep jobs from hanging forever.
+func ClampInt(val, def, max int) int {
+	if val <= 0 {
+		return def
+	}
+	if val > max {
+		return max
+	}
+	return val
 }

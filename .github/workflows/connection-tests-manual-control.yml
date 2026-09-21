@@ -3,6 +3,9 @@ name: Connection Tests - Manual Control
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   connection-tests:
     strategy:
@@ -17,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1 # Checkout the code to run tests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 # Checkout the code to run tests
 
       - name: Setup Pritunl Profile
         id: pritunl-connection # A `Setup Step ID` has been added as a reference identifier for the output `client-id`.
@@ -37,9 +40,12 @@ jobs:
       # Start VPN connection using stored client ID and password (if available)
       - name: Start VPN Connection Manually
         shell: bash
+        env:
+          CLIENT_ID: ${{ steps.pritunl-connection.outputs.client-id }}
+          PRITUNL_PROFILE_PIN: ${{ secrets.PRITUNL_PROFILE_PIN }}
         run: |
-          pritunl-client start ${{ steps.pritunl-connection.outputs.client-id }} \
-            --password ${{ secrets.PRITUNL_PROFILE_PIN || '' }}
+          pritunl-client start "$CLIENT_ID" \
+            --password "$PRITUNL_PROFILE_PIN"
           # Wait for 10 seconds to allow the connection to establish
           sleep 10
 
@@ -96,6 +102,8 @@ jobs:
       - name: Stop VPN Connection Manually
         if: ${{ always() }}
         shell: bash
+        env:
+          CLIENT_ID: ${{ steps.pritunl-connection.outputs.client-id }}
         run: |
-          pritunl-client stop ${{ steps.pritunl-connection.outputs.client-id }}
+          pritunl-client stop "$CLIENT_ID"
           # Stop the VPN connection

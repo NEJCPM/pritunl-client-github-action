@@ -157,3 +157,33 @@ func TestParseInt(t *testing.T) {
 		}
 	}
 }
+
+func TestClampInt(t *testing.T) {
+	tests := []struct {
+		val, def, max, want int
+	}{
+		{val: 0, def: 3, max: 300, want: 3},
+		{val: -5, def: 3, max: 300, want: 3},
+		{val: 10, def: 3, max: 300, want: 10},
+		{val: 1000, def: 3, max: 300, want: 300},
+	}
+
+	for _, tt := range tests {
+		if got := ClampInt(tt.val, tt.def, tt.max); got != tt.want {
+			t.Errorf("ClampInt(%d, %d, %d) = %d, want %d", tt.val, tt.def, tt.max, got, tt.want)
+		}
+	}
+}
+
+func TestLoadFromEnv_ClampsHugeTimeouts(t *testing.T) {
+	t.Setenv("PRITUNL_READY_PROFILE_TIMEOUT", "99999")
+	t.Setenv("PRITUNL_ESTABLISHED_CONNECTION_TIMEOUT", "99999")
+
+	cfg := LoadFromEnv()
+	if cfg.ReadyProfileTimeout > 300 {
+		t.Errorf("ReadyProfileTimeout not clamped: %d", cfg.ReadyProfileTimeout)
+	}
+	if cfg.EstablishedConnectionTimeout > 900 {
+		t.Errorf("EstablishedConnectionTimeout not clamped: %d", cfg.EstablishedConnectionTimeout)
+	}
+}

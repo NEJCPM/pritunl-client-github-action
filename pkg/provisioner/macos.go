@@ -22,7 +22,9 @@ func NewMacOSProvisioner() *MacOSProvisioner {
 
 func (m *MacOSProvisioner) Provision(ctx context.Context, cfg domain.ActionConfig) error {
 	if cfg.VPNMode == "wg" {
-		_ = m.run(ctx, "brew", "install", "-q", "wireguard-tools")
+		if err := m.run(ctx, "brew", "install", "-q", "wireguard-tools"); err != nil {
+			return fmt.Errorf("failed to install wireguard-tools via brew: %w", err)
+		}
 	}
 
 	if cfg.ClientVersion == "" || cfg.ClientVersion == "from-package-manager" {
@@ -31,9 +33,12 @@ func (m *MacOSProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 		}
 	} else {
 		pkgZipURL := fmt.Sprintf("https://github.com/pritunl/pritunl-client-electron/releases/download/%s/Pritunl.pkg.zip", cfg.ClientVersion)
-		zipFile := filepath.Join(getTempDir(cfg), "Pritunl.pkg.zip")
+		zipFile, err := createTempFile(getTempDir(cfg), "Pritunl-*.pkg.zip")
+		if err != nil {
+			return fmt.Errorf("failed to create temp file for pkg zip: %w", err)
+		}
 
-		if err := m.run(ctx, "curl", "-sSL", pkgZipURL, "-o", zipFile); err != nil {
+		if err := m.run(ctx, "curl", "-fsSL", pkgZipURL, "-o", zipFile); err != nil {
 			return fmt.Errorf("failed to download macOS pkg zip from %s: %w", pkgZipURL, err)
 		}
 		defer os.Remove(zipFile)

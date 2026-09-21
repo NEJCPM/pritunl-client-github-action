@@ -93,3 +93,14 @@ func TestWindowsProvisioner_CommandFailures_Propagate(t *testing.T) {
 		})
 	}
 }
+
+func TestWindowsProvisioner_WireGuardFailure_Propagates(t *testing.T) {
+	runner := newFakeRunner()
+	runner.errFor["choco"] = errBoom
+	w := newTestWindows(runner)
+
+	err := w.Provision(context.Background(), domain.ActionConfig{VPNMode: "wg", RunnerTemp: t.TempDir()})
+	if err == nil || !strings.Contains(err.Error(), "failed to install wireguard via choco") {
+		t.Fatalf("expected wireguard choco failure, got: %v", err)
+	}
+}

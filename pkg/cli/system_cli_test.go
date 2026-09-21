@@ -164,3 +164,11 @@ func TestSystemCLI_StartConnection_Error(t *testing.T) {
 		t.Fatalf("expected start error, got: %v", err)
 	}
 }
+
+func TestLimitedBuffer_Truncates(t *testing.T) {
+	lb := &limitedBuffer{max: 8}
+	_, _ = lb.Write([]byte("1234567890"))
+	if got := lb.String(); got != "12345678" {
+		t.Errorf("limitedBuffer kept %q, want 12345678", got)
+	}
+}

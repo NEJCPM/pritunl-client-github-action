@@ -7,6 +7,9 @@ import (
 	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
+// commandRunner is the seam used by provisioners to execute system commands.
+type commandRunner func(ctx context.Context, name string, args ...string) error
+
 // PlatformProvisioner handles OS package manager installation of Pritunl Client and dependencies.
 type PlatformProvisioner interface {
 	Provision(ctx context.Context, cfg domain.ActionConfig) error
@@ -16,11 +19,11 @@ type PlatformProvisioner interface {
 func NewProvisioner(runnerOS string) (PlatformProvisioner, error) {
 	switch runnerOS {
 	case "Linux":
-		return &LinuxProvisioner{}, nil
+		return NewLinuxProvisioner(), nil
 	case "macOS", "Darwin":
-		return &MacOSProvisioner{}, nil
+		return NewMacOSProvisioner(), nil
 	case "Windows":
-		return &WindowsProvisioner{}, nil
+		return NewWindowsProvisioner(), nil
 	default:
 		return nil, fmt.Errorf("unsupported runner operating system: %s", runnerOS)
 	}

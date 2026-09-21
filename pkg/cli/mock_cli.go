@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
@@ -18,6 +19,16 @@ type MockCLI struct {
 
 	Servers []domain.ProfileServer
 	ListErr error
+
+	// FailListAfter makes ListServers return ListErr once the call counter
+	// reaches this value (0 disables the behavior; ListErr then applies to
+	// every call).
+	FailListAfter int
+	ListCalls     int
+
+	// SkipAddressFor makes StartConnection NOT assign a ClientAddress for the
+	// listed server IDs, simulating servers that never establish a tunnel.
+	SkipAddressFor []string
 
 	StartErr     error
 	StartedCalls []StartCall
@@ -60,8 +71,16 @@ func (m *MockCLI) AddProfile(ctx context.Context, tarPath string) error {
 func (m *MockCLI) ListServers(ctx context.Context) ([]domain.ProfileServer, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.ListErr != nil {
+	m.ListCalls++
+	fail := m.ListErr != nil
+	if m.FailListAfter > 0 {
+		fail = m.ListCalls >= m.FailListAfter
+	}
+	if fail && m.ListErr != nil {
 		return nil, m.ListErr
+	}
+	if fail {
+		return nil, errors.New("mock list failure")
 	}
 	return m.Servers, nil
 }
@@ -88,11 +107,20 @@ func (m *MockCLI) StartConnection(ctx context.Context, serverID string, mode str
 	for i := range m.Servers {
 		if m.Servers[i].ID == serverID {
 			m.Servers[i].Status = "connected"
-			if m.Servers[i].ClientAddress == "" {
+			if m.Servers[i].ClientAddress == "" && !containsID(m.SkipAddressFor, serverID) {
 				m.Servers[i].ClientAddress = "192.168.233.2/24"
 			}
 		}
 	}
 
 	return nil
+}
+
+func containsID(ids []string, id string) bool {
+	for _, i := range ids {
+		if i == id {
+			return true
+		}
+	}
+	return false
 }

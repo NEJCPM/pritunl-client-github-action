@@ -3,3 +3,6 @@
 .agents/
 .claude/
 skills-lock.json
+coverage.out
+coverage.html
+pritunl-action

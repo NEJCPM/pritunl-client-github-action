@@ -9,34 +9,43 @@ import (
 	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
-type MacOSProvisioner struct{}
+// MacOSProvisioner installs the Pritunl client on macOS runners via Homebrew
+// or a versioned installer download. Command execution is an injectable seam.
+type MacOSProvisioner struct {
+	run commandRunner
+}
+
+// NewMacOSProvisioner returns a MacOSProvisioner wired to the real system.
+func NewMacOSProvisioner() *MacOSProvisioner {
+	return &MacOSProvisioner{run: runCmd}
+}
 
 func (m *MacOSProvisioner) Provision(ctx context.Context, cfg domain.ActionConfig) error {
 	if cfg.VPNMode == "wg" {
-		_ = runCmd(ctx, "brew", "install", "-q", "wireguard-tools")
+		_ = m.run(ctx, "brew", "install", "-q", "wireguard-tools")
 	}
 
 	if cfg.ClientVersion == "" || cfg.ClientVersion == "from-package-manager" {
-		if err := runCmd(ctx, "brew", "install", "-q", "--cask", "pritunl"); err != nil {
+		if err := m.run(ctx, "brew", "install", "-q", "--cask", "pritunl"); err != nil {
 			return fmt.Errorf("failed to install pritunl cask via brew: %w", err)
 		}
 	} else {
 		pkgZipURL := fmt.Sprintf("https://github.com/pritunl/pritunl-client-electron/releases/download/%s/Pritunl.pkg.zip", cfg.ClientVersion)
 		zipFile := filepath.Join(getTempDir(cfg), "Pritunl.pkg.zip")
 
-		if err := runCmd(ctx, "curl", "-sSL", pkgZipURL, "-o", zipFile); err != nil {
+		if err := m.run(ctx, "curl", "-sSL", pkgZipURL, "-o", zipFile); err != nil {
 			return fmt.Errorf("failed to download macOS pkg zip from %s: %w", pkgZipURL, err)
 		}
 		defer os.Remove(zipFile)
 
-		if err := runCmd(ctx, "unzip", "-qq", "-o", zipFile, "-d", getTempDir(cfg)); err != nil {
+		if err := m.run(ctx, "unzip", "-qq", "-o", zipFile, "-d", getTempDir(cfg)); err != nil {
 			return fmt.Errorf("failed to unzip %s: %w", zipFile, err)
 		}
 
 		pkgFile := filepath.Join(getTempDir(cfg), "Pritunl.pkg")
 		defer os.Remove(pkgFile)
 
-		if err := runCmd(ctx, "sudo", "installer", "-pkg", pkgFile, "-target", "/"); err != nil {
+		if err := m.run(ctx, "sudo", "installer", "-pkg", pkgFile, "-target", "/"); err != nil {
 			return fmt.Errorf("failed to install macOS pkg %s: %w", pkgFile, err)
 		}
 	}

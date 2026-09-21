@@ -475,7 +475,14 @@ Thank you for your interest in contributing to our project! We appreciate your h
    go test -v ./pkg/...
    ```
 
-2. **Integration & E2E Tests with Docker Compose**:
+2. **Test Coverage** (application packages only; the `cmd/` entrypoint and E2E tests are excluded):
+   ```bash
+   go test ./pkg/... -covermode=atomic -coverprofile=coverage.out
+   go tool cover -func=coverage.out
+   go tool cover -html=coverage.out -o coverage.html
+   ```
+
+3. **Integration & E2E Tests with Docker Compose**:
    ```bash
    # Start local Pritunl Server & MongoDB stack
    docker compose -f test/e2e/docker-compose.test.yml up -d --wait

@@ -185,6 +185,9 @@ func filterServers(allServers []domain.ProfileServer, serverFilter string) []dom
 	var matched []domain.ProfileServer
 	for _, rawTarget := range targets {
 		target := strings.TrimSpace(rawTarget)
+		if target == "" {
+			continue
+		}
 		for _, s := range allServers {
 			if strings.Contains(s.Name, target) {
 				matched = append(matched, s)

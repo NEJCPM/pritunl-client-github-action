@@ -13,6 +13,7 @@ import (
 
 const defaultPritunlVersion = "1.3.4696.56"
 const pritunlImageRepo = "ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client"
+const pritunlGPGKeyURL = "https://raw.githubusercontent.com/pritunl/pgp/master/pritunl_repo_pub.asc"
 
 type LinuxProvisioner struct{}
 
@@ -38,9 +39,8 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 	}
 
 	if cfg.ClientVersion == "" || cfg.ClientVersion == "from-package-manager" {
-		gpgKey := os.Getenv("PRITUNL_LINUX_RUNNER_GPG_KEY")
-		if gpgKey == "" {
-			gpgKey = "7568D9BB55FF9E5287D586017AE645C0CF8E292A"
+		if err := runCmd(ctx, "sudo", "apt-get", "install", "-qq", "-o=Dpkg::Use-Pty=0", "-y", "gnupg"); err != nil {
+			return fmt.Errorf("failed to install gnupg: %w", err)
 		}
 
 		distroCodename, err := getLSBCodename(ctx)
@@ -48,16 +48,19 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 			distroCodename = "noble"
 		}
 
-		repoLine := fmt.Sprintf("deb https://repo.pritunl.com/stable/apt %s main", distroCodename)
-		if err := writeToFileViaSudo("/etc/apt/sources.list.d/pritunl.list", repoLine); err != nil {
-			return fmt.Errorf("failed to configure pritunl apt repository: %w", err)
+		keyFile := fmt.Sprintf("%s/pritunl_repo_pub.asc", getTempDir(cfg))
+		if err := runCmd(ctx, "curl", "-fsSL", pritunlGPGKeyURL, "-o", keyFile); err != nil {
+			return fmt.Errorf("failed to download pritunl repository GPG key: %w", err)
+		}
+		defer os.Remove(keyFile)
+
+		if err := runCmd(ctx, "sudo", "gpg", "--dearmor", "--yes", "-o", "/usr/share/keyrings/pritunl.gpg", keyFile); err != nil {
+			return fmt.Errorf("failed to install pritunl repository GPG keyring: %w", err)
 		}
 
-		_ = runCmd(ctx, "gpg", "--keyserver", "hkp://keyserver.ubuntu.com", "--recv-keys", gpgKey)
-		gpgExportCmd := exec.CommandContext(ctx, "gpg", "--armor", "--export", gpgKey)
-		gpgOut, err := gpgExportCmd.Output()
-		if err == nil {
-			_ = writeToFileViaSudo("/etc/apt/trusted.gpg.d/pritunl.asc", string(gpgOut))
+		repoLine := fmt.Sprintf("deb [ signed-by=/usr/share/keyrings/pritunl.gpg ] https://repo.pritunl.com/stable/apt %s main", distroCodename)
+		if err := writeToFileViaSudo("/etc/apt/sources.list.d/pritunl.list", repoLine); err != nil {
+			return fmt.Errorf("failed to configure pritunl apt repository: %w", err)
 		}
 
 		if err := runCmd(ctx, "sudo", "apt-get", "update", "-qq", "-y"); err != nil {

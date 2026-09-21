@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/NEJCPM/pritunl-client-github-action/pkg/cli"
+	"github.com/NEJCPM/pritunl-client-github-action/internal/testutil"
 	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
@@ -29,7 +29,7 @@ func createDummyTarBase64() string {
 }
 
 func TestEngineConnect_Success(t *testing.T) {
-	mockCLI := cli.NewMockCLI()
+	mockCLI := testutil.NewMockCLI()
 	mockCLI.SetServers([]domain.ProfileServer{
 		{ID: "srv-1", Name: "Server A", Status: "disconnected"},
 		{ID: "srv-2", Name: "Server B", Status: "disconnected"},
@@ -81,7 +81,7 @@ func TestEngineConnect_Success(t *testing.T) {
 }
 
 func TestEngineConnect_AllServersFilter(t *testing.T) {
-	mockCLI := cli.NewMockCLI()
+	mockCLI := testutil.NewMockCLI()
 	mockCLI.SetServers([]domain.ProfileServer{
 		{ID: "srv-1", Name: "Server A", Status: "disconnected"},
 		{ID: "srv-2", Name: "Server B", Status: "disconnected"},
@@ -114,7 +114,7 @@ func TestEngineConnect_AllServersFilter(t *testing.T) {
 }
 
 func TestEngineConnect_InvalidBase64(t *testing.T) {
-	mockCLI := cli.NewMockCLI()
+	mockCLI := testutil.NewMockCLI()
 	eng := NewEngine(mockCLI)
 
 	cfg := domain.ActionConfig{

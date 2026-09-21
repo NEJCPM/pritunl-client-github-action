@@ -1,4 +1,5 @@
-package cli
+// Package testutil provides in-memory test doubles shared across packages.
+package testutil
 
 import (
 	"context"

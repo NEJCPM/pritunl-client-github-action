@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NEJCPM/pritunl-client-github-action/pkg/cli"
+	"github.com/NEJCPM/pritunl-client-github-action/internal/testutil"
 	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
-func newTestEngine() (*Engine, *cli.MockCLI) {
-	mock := cli.NewMockCLI()
+func newTestEngine() (*Engine, *testutil.MockCLI) {
+	mock := testutil.NewMockCLI()
 	return NewEngine(mock), mock
 }
 

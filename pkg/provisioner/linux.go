@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/NEJCPM/pritunl-client-github-action/pkg/checksum"
 	"github.com/NEJCPM/pritunl-client-github-action/pkg/domain"
 )
 
@@ -28,25 +29,29 @@ var validCodenamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*$`)
 // Command execution, privileged file writes, LSB detection and PATH lookup are
 // injectable seams so unit tests never run real system commands.
 type LinuxProvisioner struct {
-	run         commandRunner
-	showKeys    func(ctx context.Context, keyFile string) (string, error)
-	lsbCodename func(ctx context.Context) (string, error)
-	lookPath    func(string) (string, error)
-	writeFile   func(ctx context.Context, filePath string, content string) error
-	verify      artifactVerifier
-	goArch      string
+	run            commandRunner
+	showKeys       func(ctx context.Context, keyFile string) (string, error)
+	lsbCodename    func(ctx context.Context) (string, error)
+	lookPath       func(string) (string, error)
+	writeFile      func(ctx context.Context, filePath string, content string) error
+	runOutput      func(ctx context.Context, name string, args ...string) (string, error)
+	verify         artifactVerifier
+	cosignChecksum func(path string, expected string) error
+	goArch         string
 }
 
 // NewLinuxProvisioner returns a LinuxProvisioner wired to the real system.
 func NewLinuxProvisioner() *LinuxProvisioner {
 	return &LinuxProvisioner{
-		run:         runCmd,
-		showKeys:    showKeyFingerprints,
-		lsbCodename: getLSBCodename,
-		lookPath:    exec.LookPath,
-		writeFile:   writeToFileViaSudo,
-		verify:      newArtifactVerifier(),
-		goArch:      runtime.GOARCH,
+		run:            runCmd,
+		showKeys:       showKeyFingerprints,
+		lsbCodename:    getLSBCodename,
+		lookPath:       exec.LookPath,
+		writeFile:      writeToFileViaSudo,
+		runOutput:      runCmdOutput,
+		verify:         newArtifactVerifier(),
+		cosignChecksum: checksum.VerifyFile,
+		goArch:         runtime.GOARCH,
 	}
 }
 
@@ -164,6 +169,14 @@ func (l *LinuxProvisioner) provisionFromDocker(ctx context.Context, cfg domain.A
 		return fmt.Errorf("failed to pull %s: %w", image, err)
 	}
 
+	digest, err := l.resolveImageDigest(ctx, image)
+	if err != nil {
+		return err
+	}
+	if err := l.verifyImageSignature(ctx, cfg, digest); err != nil {
+		return err
+	}
+
 	_ = l.run(ctx, "docker", "rm", "-f", containerName)
 
 	if err := l.run(ctx, "docker", "create", "--name", containerName, "--entrypoint", "/pritunl-client", image); err != nil {
@@ -203,6 +216,12 @@ WantedBy=multi-user.target
 		return err
 	}
 	return l.run(ctx, "sudo", "systemctl", "enable", "--now", "pritunl-client")
+}
+
+func runCmdOutput(ctx context.Context, name string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	out, err := cmd.Output()
+	return string(out), err
 }
 
 func getLSBCodename(ctx context.Context) (string, error) {

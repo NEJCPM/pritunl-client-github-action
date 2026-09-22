@@ -11,6 +11,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 jobs:
   build:
@@ -25,6 +26,7 @@ jobs:
     outputs:
       image_tag_amd64: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }}-amd64
       image_tag_arm64: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }}-arm64
+      pritunl_commit: ${{ steps.resolve_commit.outputs.commit }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -37,6 +39,13 @@ jobs:
         run: |
           git clone --branch "${{ inputs.pritunl-version }}" --depth 1 \
             https://github.com/pritunl/pritunl-client-electron.git /tmp/pritunl-src
+
+      - name: Resolve Pritunl commit SHA
+        id: resolve_commit
+        run: |
+          commit="$(git -C /tmp/pritunl-src rev-parse HEAD)"
+          echo "commit=${commit}" >> "$GITHUB_OUTPUT"
+          echo "Building Pritunl ${{ inputs.pritunl-version }} at commit ${commit}"
 
       - name: Build Pritunl CLI
         run: |
@@ -69,11 +78,18 @@ jobs:
           file: build/Dockerfile.pritunl
           platforms: linux/${{ matrix.arch }}
           push: true
+          labels: |
+            org.opencontainers.image.source=https://github.com/pritunl/pritunl-client-electron
+            org.opencontainers.image.revision=${{ steps.resolve_commit.outputs.commit }}
+            org.opencontainers.image.version=${{ inputs.pritunl-version }}
           tags: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }}-${{ matrix.arch }}
 
   merge:
     needs: build
     runs-on: ubuntu-24.04
+    outputs:
+      image_digest: ${{ steps.digest.outputs.digest }}
+      pritunl_commit: ${{ needs.build.outputs.pritunl_commit }}
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -92,3 +108,51 @@ jobs:
             -t ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:latest \
             ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }}-amd64 \
             ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }}-arm64
+
+      - name: Resolve multi-arch digest
+        id: digest
+        run: |
+          set -euo pipefail
+          digest="$(docker buildx imagetools inspect \
+            ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }} \
+            --format '{{.Manifest.Digest}}')"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "Multi-arch digest: ${digest}"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.2
+
+      - name: Sign multi-arch image digest (keyless)
+        env:
+          DIGEST: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client@${{ steps.digest.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${DIGEST}"
+          echo "Image signed: ${DIGEST}"
+
+      - name: Verify signature with the release policy
+        env:
+          DIGEST: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client@${{ steps.digest.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign verify \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github\.com/NEJCPM/pritunl-client-github-action/\.github/workflows/build-pritunl-image\.yml@refs/(heads/main|tags/.+)$' \
+            "${DIGEST}"
+
+      - name: Publish image provenance
+        env:
+          PRITUNL_COMMIT: ${{ needs.build.outputs.pritunl_commit }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cat <<EOF
+          ## Pritunl Client Image provenance (${{ inputs.pritunl-version }})
+          - image: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client:${{ inputs.pritunl-version }}
+          - digest: ${DIGEST}
+          - pritunl commit: ${PRITUNL_COMMIT}
+          - signature: cosign keyless (GitHub OIDC), policy =
+            issuer=https://token.actions.githubusercontent.com
+            repo=NEJCPM/pritunl-client-github-action
+            workflow=build-pritunl-image.yml
+          EOF

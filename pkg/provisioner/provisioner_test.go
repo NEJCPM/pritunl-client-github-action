@@ -79,6 +79,10 @@ func fakeLinux(l *LinuxProvisioner, runner *fakeRunner) {
 	l.lookPath = func(string) (string, error) { return "/usr/bin/pritunl-client", nil }
 	l.writeFile = func(context.Context, string, string) error { return nil }
 	l.verify = func(domain.ActionConfig, string, string) error { return nil }
+	l.runOutput = func(ctx context.Context, name string, args ...string) (string, error) {
+		runner.calls = append(runner.calls, cmdCall{Name: name, Args: append([]string(nil), args...)})
+		return "ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client@sha256:" + strings.Repeat("b", 64), nil
+	}
 	l.goArch = "amd64"
 }
 

@@ -13,6 +13,7 @@ permissions:
 jobs:
   e2e-docker:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -20,21 +21,22 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.5'
+          go-version: '1.27.1'
 
       - name: Run Unit Tests
-        run: go test -v ./pkg/...
+        run: go test ./pkg/...
 
-      - name: Start Docker Compose Pritunl Stack
-        run: |
-          docker compose -f test/e2e/docker-compose.test.yml up -d --wait
-
+      # The e2e suite starts the Pritunl/Mongo stack itself, provisions the
+      # client through the real production path (apt + GPG keyring), imports
+      # a dynamically generated profile and validates the tunnel.
       - name: Run E2E Integration Tests
         working-directory: test/e2e
         run: |
-          go test -v -tags=e2e .
+          go test -v -tags=e2e -timeout 25m \
+            -run 'TestE2E_PritunlServerAuth|TestE2E_ProfileFixture|TestE2E_FullActionFlowLinux' .
 
       - name: Teardown Docker Compose
         if: always()
+        working-directory: test/e2e
         run: |
-          docker compose -f test/e2e/docker-compose.test.yml down -v
+          docker compose -f docker-compose.test.yml down -v

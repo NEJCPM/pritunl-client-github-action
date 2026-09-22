@@ -1,3 +1,3 @@
 module github.com/NEJCPM/pritunl-client-github-action
 
-go 1.25.0
+go 1.27.1

@@ -44,6 +44,7 @@ func TestLoadFromEnv_AllValuesSet(t *testing.T) {
 }
 
 func TestLoadFromEnv_Defaults(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "")
 	cfg := LoadFromEnv()
 
 	if cfg.VPNMode != "ovpn" {

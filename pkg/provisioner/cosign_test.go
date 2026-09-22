@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -117,8 +118,12 @@ func TestLinuxProvisioner_Arm64_CosignInstallIsPinnedAndChecksummed(t *testing.T
 	}
 
 	script := runner.joined()
-	if !strings.Contains(script, "cosign/releases/download/"+cosignVersion+"/cosign-linux-arm64") {
-		t.Errorf("expected pinned arm64 cosign download, got:\n%s", script)
+	wantArch := "arm64"
+	if runtime.GOARCH == "amd64" {
+		wantArch = "amd64"
+	}
+	if !strings.Contains(script, "cosign/releases/download/"+cosignVersion+"/cosign-linux-"+wantArch) {
+		t.Errorf("expected pinned %s cosign download, got:\n%s", wantArch, script)
 	}
 	// The checksum verification happens through checksum.VerifyFile which is
 	// not a run command; assert the install step went through sudo.

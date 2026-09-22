@@ -21,6 +21,7 @@ type fakeRunner struct {
 	errFor  map[string]error
 	always  error
 	ignored map[string]bool // commands whose failures are tolerated by prod code
+	onCall  []func(name string, args []string)
 }
 
 func newFakeRunner() *fakeRunner {
@@ -28,7 +29,11 @@ func newFakeRunner() *fakeRunner {
 }
 
 func (f *fakeRunner) run(_ context.Context, name string, args ...string) error {
-	f.calls = append(f.calls, cmdCall{Name: name, Args: append([]string(nil), args...)})
+	call := cmdCall{Name: name, Args: append([]string(nil), args...)}
+	f.calls = append(f.calls, call)
+	for _, hook := range f.onCall {
+		hook(call.Name, call.Args)
+	}
 	if f.always != nil {
 		return f.always
 	}
@@ -73,6 +78,7 @@ func fakeLinux(l *LinuxProvisioner, runner *fakeRunner) {
 	l.lsbCodename = func(context.Context) (string, error) { return "jammy", nil }
 	l.lookPath = func(string) (string, error) { return "/usr/bin/pritunl-client", nil }
 	l.writeFile = func(context.Context, string, string) error { return nil }
+	l.verify = func(domain.ActionConfig, string, string) error { return nil }
 	l.goArch = "amd64"
 }
 

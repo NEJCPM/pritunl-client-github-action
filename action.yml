@@ -34,6 +34,11 @@ inputs:
     required: false
     default: 'from-package-manager'
 
+  client-sha256:
+    description: Expected SHA-256 of the versioned client artifact (required for versions not pinned in the checksum manifest)
+    required: false
+    default: ''
+
   start-connection:
     description: Start VPN connection automatically (true/false)
     required: false
@@ -83,6 +88,7 @@ runs:
         PRITUNL_PROFILE_SERVER: ${{ inputs.profile-server }}
         PRITUNL_VPN_MODE: ${{ inputs.vpn-mode }}
         PRITUNL_CLIENT_VERSION: ${{ inputs.client-version }}
+        PRITUNL_CLIENT_SHA256: ${{ inputs.client-sha256 }}
         PRITUNL_START_CONNECTION: ${{ inputs.start-connection }}
         PRITUNL_READY_PROFILE_TIMEOUT: ${{ inputs.ready-profile-timeout }}
         PRITUNL_ESTABLISHED_CONNECTION_TIMEOUT: ${{ inputs.established-connection-timeout }}

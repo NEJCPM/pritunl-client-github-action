@@ -12,12 +12,13 @@ import (
 // Chocolatey or a versioned installer download. Command execution is an
 // injectable seam.
 type WindowsProvisioner struct {
-	run commandRunner
+	run    commandRunner
+	verify artifactVerifier
 }
 
 // NewWindowsProvisioner returns a WindowsProvisioner wired to the real system.
 func NewWindowsProvisioner() *WindowsProvisioner {
-	return &WindowsProvisioner{run: runCmd}
+	return &WindowsProvisioner{run: runCmd, verify: newArtifactVerifier()}
 }
 
 func (w *WindowsProvisioner) Provision(ctx context.Context, cfg domain.ActionConfig) error {
@@ -42,6 +43,10 @@ func (w *WindowsProvisioner) Provision(ctx context.Context, cfg domain.ActionCon
 			return fmt.Errorf("failed to download Pritunl.exe from %s: %w", exeURL, err)
 		}
 		defer os.Remove(exeFile)
+
+		if err := w.verify(cfg, "exe", exeFile); err != nil {
+			return err
+		}
 
 		psCmd := fmt.Sprintf("Start-Process -FilePath '%s' -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait", exeFile)
 		if err := w.run(ctx, "pwsh", "-ExecutionPolicy", "Bypass", "-Command", psCmd); err != nil {

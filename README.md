@@ -81,6 +81,10 @@ Provides input parameters for the **Pritunl Client GitHub Action**, allowing use
       # OPTIONAL: Pritunl Client Version (Numerical dot-separated identifiers, default: latest version from Package Manager)
       # Description: Specify the Pritunl client version to use.
 
+    client-sha256: ''
+      # OPTIONAL: Expected SHA-256 of the versioned client artifact
+      # Description: Required checksum when using a client-version that is not pinned in the checksum manifest. Overrides the manifest value when provided.
+
     start-connection: ''
       # OPTIONAL: Start the Connection (Boolean, default: true)
       # Description: Set to 'false' to prevent the connection from starting automatically.
@@ -432,6 +436,8 @@ For details on runner billing, please refer to the "[About billing for GitHub Ac
     - Specify the desired Pritunl Client version using the `client-version` input in your GitHub Action. This will download the client directly from the official [Pritunl Client GitHub Releases](https://github.com/pritunl/pritunl-client-electron/releases) page, ensuring you get the exact version you need.
 
       > NOTE: When specifying the `client-version` input, please use the version number without the 'v' prefix. For example, use 1.3.3883.60 instead of v1.3.3883.60.
+
+      > NOTE: Downloads for versioned installs are verified against the SHA-256 digests pinned in [pkg/checksum/manifest.json](./pkg/checksum/manifest.json). Versions without a pinned digest must be accompanied by the `client-sha256` input; a checksum mismatch aborts the installation before anything is executed.
 
       _Example:_
 

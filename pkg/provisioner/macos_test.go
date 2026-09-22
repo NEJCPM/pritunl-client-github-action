@@ -11,6 +11,7 @@ import (
 func newTestMacOS(runner *fakeRunner) *MacOSProvisioner {
 	m := NewMacOSProvisioner()
 	m.run = runner.run
+	m.verify = func(domain.ActionConfig, string, string) error { return nil }
 	return m
 }
 

@@ -14,6 +14,7 @@ var errBoom = errors.New("boom")
 func newTestWindows(runner *fakeRunner) *WindowsProvisioner {
 	w := NewWindowsProvisioner()
 	w.run = runner.run
+	w.verify = func(domain.ActionConfig, string, string) error { return nil }
 	return w
 }
 

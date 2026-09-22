@@ -12,12 +12,13 @@ import (
 // MacOSProvisioner installs the Pritunl client on macOS runners via Homebrew
 // or a versioned installer download. Command execution is an injectable seam.
 type MacOSProvisioner struct {
-	run commandRunner
+	run    commandRunner
+	verify artifactVerifier
 }
 
 // NewMacOSProvisioner returns a MacOSProvisioner wired to the real system.
 func NewMacOSProvisioner() *MacOSProvisioner {
-	return &MacOSProvisioner{run: runCmd}
+	return &MacOSProvisioner{run: runCmd, verify: newArtifactVerifier()}
 }
 
 func (m *MacOSProvisioner) Provision(ctx context.Context, cfg domain.ActionConfig) error {
@@ -42,6 +43,10 @@ func (m *MacOSProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 			return fmt.Errorf("failed to download macOS pkg zip from %s: %w", pkgZipURL, err)
 		}
 		defer os.Remove(zipFile)
+
+		if err := m.verify(cfg, "pkg-zip", zipFile); err != nil {
+			return err
+		}
 
 		if err := m.run(ctx, "unzip", "-qq", "-o", zipFile, "-d", getTempDir(cfg)); err != nil {
 			return fmt.Errorf("failed to unzip %s: %w", zipFile, err)

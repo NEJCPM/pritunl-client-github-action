@@ -33,6 +33,7 @@ type LinuxProvisioner struct {
 	lsbCodename func(ctx context.Context) (string, error)
 	lookPath    func(string) (string, error)
 	writeFile   func(ctx context.Context, filePath string, content string) error
+	verify      artifactVerifier
 	goArch      string
 }
 
@@ -44,6 +45,7 @@ func NewLinuxProvisioner() *LinuxProvisioner {
 		lsbCodename: getLSBCodename,
 		lookPath:    exec.LookPath,
 		writeFile:   writeToFileViaSudo,
+		verify:      newArtifactVerifier(),
 		goArch:      runtime.GOARCH,
 	}
 }
@@ -119,6 +121,7 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 		if !validCodenamePattern.MatchString(distroCodename) {
 			return fmt.Errorf("detected invalid distro codename %q; refusing to download distro-specific deb package", distroCodename)
 		}
+		artifactKey := fmt.Sprintf("deb-%s-amd64", distroCodename)
 		debURL := fmt.Sprintf("https://github.com/pritunl/pritunl-client-electron/releases/download/%s/pritunl-client_%s-0ubuntu1.%s_amd64.deb", cfg.ClientVersion, cfg.ClientVersion, distroCodename)
 		installFile := fmt.Sprintf("%s/pritunl-client.deb", getTempDir(cfg))
 
@@ -126,6 +129,10 @@ func (l *LinuxProvisioner) Provision(ctx context.Context, cfg domain.ActionConfi
 			return fmt.Errorf("failed to download deb package from %s: %w", debURL, err)
 		}
 		defer os.Remove(installFile)
+
+		if err := l.verify(cfg, artifactKey, installFile); err != nil {
+			return err
+		}
 
 		if err := l.run(ctx, "sudo", "apt-get", "install", "-qq", "-o=Dpkg::Use-Pty=0", "-y", installFile); err != nil {
 			return fmt.Errorf("failed to install deb package %s: %w", installFile, err)

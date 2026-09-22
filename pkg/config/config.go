@@ -38,6 +38,7 @@ func LoadFromEnv() domain.ActionConfig {
 		ProfileServer:                os.Getenv("PRITUNL_PROFILE_SERVER"),
 		VPNMode:                      NormalizeMode(os.Getenv("PRITUNL_VPN_MODE")),
 		ClientVersion:                os.Getenv("PRITUNL_CLIENT_VERSION"),
+		ClientSHA256:                 os.Getenv("PRITUNL_CLIENT_SHA256"),
 		StartConnection:              ParseBool(os.Getenv("PRITUNL_START_CONNECTION"), true),
 		ReadyProfileTimeout:          ClampInt(ParseInt(os.Getenv("PRITUNL_READY_PROFILE_TIMEOUT"), 3), 3, maxReadyProfileTimeoutSecs),
 		EstablishedConnectionTimeout: ClampInt(ParseInt(os.Getenv("PRITUNL_ESTABLISHED_CONNECTION_TIMEOUT"), 30), 30, maxEstablishedConnectionTimeoutSecs),

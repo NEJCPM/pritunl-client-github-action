@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "artifacts": {
+    "1.3.4696.56": {
+      "deb-noble-amd64": "c99fed093089fc635438284bb8611fb30145ab20d097a089fd78542ccc36fdea",
+      "deb-jammy-amd64": "e8a1722faa0393fb09d320831fc3fa430d9d53a592bed837fa9f8acd74ec0e88",
+      "pkg-zip": "474f3be3103c30624e58ea6d3ad131c488c098f8c5444f59d91ede070cad80c4",
+      "exe": "5ba16b22ba272b72d3a817b8b3f349776f2f26ad57a744b8669a37a64d7ffaa6"
+    },
+    "1.3.3883.60": {
+      "deb-noble-amd64": "22e649bdf69c6268cfa1767a20c328d3e60927998fde99a34463b9f8b6e4815d",
+      "deb-jammy-amd64": "6f22b9ae5c0fa8077537edc1055f911e41e37dc050ae85dcbeebac0a42262af9",
+      "pkg-zip": "a761abe6ba0f910f7bf38714628a90c80e8b004543b03ef19976d201d6e0e75a",
+      "exe": "3102d2a8efcf756e7c5471c597f9c7ea94e0b2604ec0600dae345d47d31fe8c6"
+    }
+  }
+}

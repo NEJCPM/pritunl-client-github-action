@@ -7,6 +7,7 @@ type ActionConfig struct {
 	ProfileServer                string `json:"profile_server"`
 	VPNMode                      string `json:"vpn_mode"`
 	ClientVersion                string `json:"client_version"`
+	ClientSHA256                 string `json:"client_sha256"`
 	StartConnection              bool   `json:"start_connection"`
 	ReadyProfileTimeout          int    `json:"ready_profile_timeout"`
 	EstablishedConnectionTimeout int    `json:"established_connection_timeout"`

@@ -29,7 +29,7 @@ func main() {
 	}
 
 	// 2. Display installed version
-	systemCLI := cli.NewSystemCLI("")
+	systemCLI := cli.NewSystemCLI(provisioner.ResolveClientBinaryPath())
 	version, err := systemCLI.Version(ctx)
 	if err == nil {
 		fmt.Printf("Pritunl Client Installed Version:\n%s\n", version)

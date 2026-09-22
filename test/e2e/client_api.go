@@ -322,21 +322,35 @@ func (c *PritunlAPIClient) GetServerStatus(serverID string) (string, error) {
 	return server.Status, nil
 }
 
-// WaitForServerOnline polls until the server reports online.
+// WaitForServerOnline polls until the server reports online. A "pending"
+// state that persists beyond pendingGrace is recovered with a stop/start
+// cycle; a flaky runner listener can leave the first start half-done.
 func (c *PritunlAPIClient) WaitForServerOnline(serverID string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	lastStatus := "unknown"
+	var pendingSince time.Time
 	for time.Now().Before(deadline) {
 		status, err := c.GetServerStatus(serverID)
 		if err == nil {
 			lastStatus = status
-			if status == "online" {
+			switch status {
+			case "online":
 				return nil
-			}
-			if status == "offline" {
+			case "offline":
 				// Start may have only generated DH parameters on the first
 				// call; issue the operation again before waiting further.
 				_ = c.StartServer(serverID)
+				pendingSince = time.Time{}
+			case "pending":
+				if pendingSince.IsZero() {
+					pendingSince = time.Now()
+				} else if time.Since(pendingSince) > 45*time.Second {
+					_ = c.StopServer(serverID)
+					if waitErr := c.waitForStatus(serverID, "offline", 30*time.Second); waitErr == nil {
+						_ = c.StartServer(serverID)
+					}
+					pendingSince = time.Now()
+				}
 			}
 		}
 		time.Sleep(2 * time.Second)

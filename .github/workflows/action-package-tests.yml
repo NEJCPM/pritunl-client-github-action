@@ -153,5 +153,9 @@ jobs:
         run: |
           set -euo pipefail
           export PATH="$HOME/bin:$PATH"
-          pritunl-client version
+          if [ -f "/c/Program Files (x86)/Pritunl/pritunl-client.exe" ]; then
+            "/c/Program Files (x86)/Pritunl/pritunl-client.exe" version
+          else
+            pritunl-client version
+          fi
           echo "Packaged action provisioned the client and failed on the empty profile as expected."

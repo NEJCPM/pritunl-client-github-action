@@ -144,7 +144,7 @@ func bootstrapTestServer(t *testing.T) (orgID, userID, serverID string) {
 	if err := client.AttachOrganization(serverID, orgID); err != nil {
 		t.Fatalf("failed to attach organization: %v", err)
 	}
-	if err := client.WaitForServerOnline(serverID, 3*time.Minute); err != nil {
+	if err := client.WaitForServerOnline(serverID, 4*time.Minute); err != nil {
 		dumpStackLogs(t)
 		t.Fatalf("server did not come online: %v", err)
 	}

@@ -26,8 +26,9 @@ Windows installer) the downloaded file must match the checksum recorded here.
 | `exe` | Windows | `Pritunl.exe` |
 
 Versions not listed here are still installable when the caller supplies the
-expected digest through the `client-sha256` input; supplying that input also
-overrides the manifest value.
+expected digest through the `client-sha256` input. For versions pinned here,
+the manifest digest always wins: a `client-sha256` that differs from the
+pinned digest is rejected.
 
 ## Verification policy
 

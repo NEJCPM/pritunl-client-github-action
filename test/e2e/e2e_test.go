@@ -205,13 +205,19 @@ func TestE2E_PritunlServerAuth(t *testing.T) {
 }
 
 // TestE2E_ProfileFixture generates a valid, connectable profile tar.
+// When E2E_PROFILE_OUT is set, the base64 fixture is written to that path
+// (never logged) so workflows can feed it to the packaged composite action.
 func TestE2E_ProfileFixture(t *testing.T) {
 	orgID, userID, _ := bootstrapTestServer(t)
 	profile := buildProfileFixture(t, orgID, userID)
 	if len(profile) < 1024 {
 		t.Fatalf("profile fixture suspiciously small: %d bytes", len(profile))
 	}
-	t.Logf("profile fixture generated (%d bytes base64)", len(profile))
+	if out := os.Getenv("E2E_PROFILE_OUT"); out != "" {
+		if err := os.WriteFile(out, []byte(profile), 0600); err != nil {
+			t.Fatalf("failed to write profile fixture: %v", err)
+		}
+	}
 }
 
 // TestE2E_FullActionFlowLinux runs the complete production path: real Linux

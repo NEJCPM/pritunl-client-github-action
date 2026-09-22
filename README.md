@@ -490,13 +490,14 @@ Thank you for your interest in contributing to our project! We appreciate your h
 
 3. **Integration & E2E Tests with Docker Compose**:
    ```bash
-   # Start local Pritunl Server & MongoDB stack
-   docker compose -f test/e2e/docker-compose.test.yml up -d --wait
-
-   # Run live E2E connection tests
-   go test -v -tags=e2e ./test/e2e/...
+   # Run live E2E connection tests (the suite manages the stack itself)
+   go test -v -tags=e2e -timeout 25m ./test/e2e/
 
    # Teardown stack
+   docker compose -f test/e2e/docker-compose.test.yml down -v
+
+   # Manual stack management (optional; the e2e suite starts it automatically)
+   docker compose -f test/e2e/docker-compose.test.yml up -d --build --wait
    docker compose -f test/e2e/docker-compose.test.yml down -v
    ```
 

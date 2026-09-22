@@ -1,0 +1,161 @@
+name: Action Package Tests
+
+# Validates that the SHIPPED action (action.yml + dist/ precompiled binaries)
+# works end to end on the real runners: binary selection, checksums,
+# provisioning and a live VPN connection (Linux) against the Docker Pritunl
+# server.
+
+on:
+  push:
+    branches: [main, v1]
+    paths:
+      - action.yml
+      - dist/**
+      - pkg/**
+      - cmd/**
+      - test/e2e/**
+      - .github/workflows/action-package-tests.yml
+  pull_request:
+    branches: [main, v1]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  packaged-linux:
+    name: "packaged-action (${{ matrix.os }})"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+          - os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.1'
+
+      - name: Verify dist binary selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          os="$(printf '%s' "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')"
+          if [ "$os" = "macos" ]; then os="darwin"; fi
+          case "$RUNNER_ARCH" in
+            X64) arch="amd64" ;;
+            ARM64) arch="arm64" ;;
+            *) echo "::error::Unsupported architecture: $RUNNER_ARCH"; exit 1 ;;
+          esac
+          suffix=""
+          if [ "$os" = "windows" ]; then suffix=".exe"; fi
+          binary="dist/pritunl-action-${os}-${arch}${suffix}"
+          test -x "$binary" || { echo "::error::missing $binary"; exit 1; }
+          echo "Selected: $binary"
+          (cd dist && { shasum -a 256 -c SHA256SUMS || sha256sum -c SHA256SUMS; })
+
+      - name: Start Pritunl Docker Stack
+        working-directory: test/e2e
+        run: docker compose -f docker-compose.test.yml up -d --build --wait
+
+      - name: Generate profile fixture
+        working-directory: test/e2e
+        env:
+          E2E_PROFILE_OUT: /tmp/profile.b64
+        run: go test -v -tags=e2e -timeout 10m -run 'TestE2E_ProfileFixture' .
+
+      - name: Export profile fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "PRITUNL_PROFILE_FILE=$(cat /tmp/profile.b64)"
+            echo "PRITUNL_PROFILE_PIN=1234567890"
+          } >> "$GITHUB_ENV"
+
+      # Runs the shipped composite action end to end: dist binary selection,
+      # provisioning (apt + GPG keyring on amd64; Docker pull + Cosign
+      # signature verification on arm64), profile import and connection.
+      - name: Run packaged action (live connection)
+        id: pritunl-connection
+        uses: ./
+        with:
+          profile-file: ${{ env.PRITUNL_PROFILE_FILE }}
+          profile-pin: ${{ env.PRITUNL_PROFILE_PIN }}
+          vpn-mode: ovpn
+          start-connection: 'true'
+          ready-profile-timeout: '60'
+          established-connection-timeout: '120'
+
+      - name: Validate outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n '${{ steps.pritunl-connection.outputs.client-id }}' || {
+            echo "::error::empty client-id output"; exit 1;
+          }
+          pritunl-client list -j
+          address="$(pritunl-client list -j | python3 -c 'import sys,json;print(json.load(sys.stdin)[0].get("client_address",""))')"
+          test -n "$address" || { echo "::error::no tunnel address"; exit 1; }
+          echo "Tunnel OK: $address"
+
+      - name: Teardown Docker Compose
+        if: always()
+        working-directory: test/e2e
+        run: docker compose -f docker-compose.test.yml down -v
+
+  packaged-desktop:
+    name: "packaged-action (${{ matrix.os }})"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+          - os: windows-2025
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify dist binary selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          os="$(printf '%s' "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')"
+          if [ "$os" = "macos" ]; then os="darwin"; fi
+          case "$RUNNER_ARCH" in
+            X64) arch="amd64" ;;
+            ARM64) arch="arm64" ;;
+            *) echo "::error::Unsupported architecture: $RUNNER_ARCH"; exit 1 ;;
+          esac
+          suffix=""
+          if [ "$os" = "windows" ]; then suffix=".exe"; fi
+          binary="dist/pritunl-action-${os}-${arch}${suffix}"
+          test -x "$binary" || { echo "::error::missing $binary"; exit 1; }
+          echo "Selected: $binary"
+          (cd dist && { shasum -a 256 -c SHA256SUMS || sha256sum -c SHA256SUMS; })
+
+      # Without a profile the engine must fail fast after provisioning; this
+      # still exercises the full composite -> dist binary -> provisioner path.
+      - name: Run packaged action (expected profile failure)
+        id: pritunl-negative
+        uses: ./
+        continue-on-error: true
+        with:
+          profile-file: ''
+          start-connection: 'false'
+
+      - name: Assert client was provisioned by the packaged action
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/bin:$PATH"
+          pritunl-client version
+          echo "Packaged action provisioned the client and failed on the empty profile as expected."

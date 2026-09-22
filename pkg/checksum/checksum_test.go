@@ -54,7 +54,8 @@ func TestExpected_Policy(t *testing.T) {
 		wantErr   string
 	}{
 		{name: "pinned version uses manifest", version: "1.2.3", key: "deb-noble-amd64", want: strings.Repeat("a", 64)},
-		{name: "caller input overrides manifest", version: "1.2.3", key: "deb-noble-amd64", clientSHA: strings.Repeat("b", 64), want: strings.Repeat("b", 64)},
+		{name: "caller input matching manifest accepted", version: "1.2.3", key: "deb-noble-amd64", clientSHA: strings.Repeat("a", 64), want: strings.Repeat("a", 64)},
+		{name: "caller input differing from manifest rejected", version: "1.2.3", key: "deb-noble-amd64", clientSHA: strings.Repeat("b", 64), wantErr: "pinned digests cannot be overridden"},
 		{name: "caller input accepted for unpinned", version: "9.9.9", key: "exe", clientSHA: strings.Repeat("c", 64), want: strings.Repeat("c", 64)},
 		{name: "unpinned without input rejected", version: "9.9.9", key: "exe", wantErr: "no pinned checksum"},
 		{name: "pinned without digest rejected", version: "1.2.3", key: "exe", wantErr: "no digest for"},

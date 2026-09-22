@@ -43,9 +43,13 @@ func Load() (*Manifest, error) {
 	return &m, nil
 }
 
-// Expected returns the digest that must match the artifact, applying the
-// policy: caller-supplied input overrides the manifest; pinned versions
-// without any digest are rejected; unpinned versions require input.
+// Expected returns the digest that must match the artifact.
+//
+// Policy:
+//   - Pinned version with a manifest digest: the manifest wins. A caller
+//     input that differs is rejected - pinned digests cannot be overridden.
+//   - Pinned version without a digest for the key: rejected.
+//   - Unpinned version: requires the caller-supplied client-sha256 input.
 func (m *Manifest) Expected(version, artifactKey, clientSHA256 string) (string, error) {
 	normalized := normalizeSHA256(clientSHA256)
 
@@ -55,18 +59,20 @@ func (m *Manifest) Expected(version, artifactKey, clientSHA256 string) (string, 
 		pinnedDigest = entry[artifactKey]
 	}
 
-	if normalized != "" {
-		// Caller-provided digest wins so a maintainer can override or an
-		// advanced user can pin an arbitrary version explicitly.
-		return normalized, nil
-	}
 	if pinned {
 		if pinnedDigest == "" {
-			return "", fmt.Errorf("version %s is pinned in the checksum manifest but has no digest for %q; update security/manifest.json or supply client-sha256", version, artifactKey)
+			return "", fmt.Errorf("version %s is pinned in the checksum manifest but has no digest for %q; update pkg/checksum/manifest.json", version, artifactKey)
+		}
+		if normalized != "" && normalized != pinnedDigest {
+			return "", fmt.Errorf("client-sha256 does not match the pinned digest for version %s (%q); pinned digests cannot be overridden", version, artifactKey)
 		}
 		return pinnedDigest, nil
 	}
-	return "", fmt.Errorf("version %s has no pinned checksum for %q; add it to security/manifest.json or supply client-sha256", version, artifactKey)
+
+	if normalized == "" {
+		return "", fmt.Errorf("version %s has no pinned checksum for %q; add it to pkg/checksum/manifest.json or supply client-sha256", version, artifactKey)
+	}
+	return normalized, nil
 }
 
 // VerifyFile hashes the file at path and compares it with the expected

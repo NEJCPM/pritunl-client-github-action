@@ -73,12 +73,6 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Setup Go
-      uses: actions/setup-go@v7.0.0
-      with:
-        go-version: '1.27.1'
-        cache: false
-
     - name: Setup Pritunl Client
       id: pritunl-client
       env:
@@ -95,4 +89,20 @@ runs:
         PRITUNL_CONCEALED_OUTPUTS: ${{ inputs.concealed-outputs }}
       shell: bash
       run: |
-        (cd "${GITHUB_ACTION_PATH}" && go run ./cmd/pritunl-action)
+        set -euo pipefail
+        os="$(printf '%s' "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')"
+        # dist binary names use the Go toolchain OS name for macOS
+        if [ "$os" = "macos" ]; then os="darwin"; fi
+        case "$RUNNER_ARCH" in
+          X64) arch="amd64" ;;
+          ARM64) arch="arm64" ;;
+          *) echo "::error::Unsupported runner architecture: $RUNNER_ARCH" >&2; exit 1 ;;
+        esac
+        suffix=""
+        if [ "$os" = "windows" ]; then suffix=".exe"; fi
+        binary="${GITHUB_ACTION_PATH}/dist/pritunl-action-${os}-${arch}${suffix}"
+        if [ ! -x "$binary" ]; then
+          echo "::error::Precompiled action binary not found for ${os}-${arch}: ${binary}" >&2
+          exit 1
+        fi
+        exec "$binary"

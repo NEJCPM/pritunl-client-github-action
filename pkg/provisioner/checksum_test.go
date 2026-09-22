@@ -47,7 +47,7 @@ func TestLinuxProvisioner_ChecksumVerifiedBeforeInstall(t *testing.T) {
 	if err := l.Provision(context.Background(), cfg); err != nil {
 		t.Fatalf("Provision failed: %v", err)
 	}
-	if verifiedPath != artifact {
+	if filepath.Clean(verifiedPath) != filepath.Clean(artifact) {
 		t.Errorf("verified path = %q, want %q", verifiedPath, artifact)
 	}
 }

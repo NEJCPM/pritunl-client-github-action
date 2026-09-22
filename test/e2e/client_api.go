@@ -53,6 +53,8 @@ type authSessionResponse struct {
 }
 
 // Authenticate creates an administrator session and fetches the CSRF token.
+// The server healthcheck can report healthy slightly before the web layer is
+// fully serving, so transient connection errors and 5xx responses are retried.
 func (c *PritunlAPIClient) Authenticate(username, password string) error {
 	payload := map[string]string{
 		"username": username,
@@ -60,31 +62,42 @@ func (c *PritunlAPIClient) Authenticate(username, password string) error {
 	}
 	body, _ := json.Marshal(payload)
 
-	resp, err := c.doRaw(http.MethodPost, "/auth/session", bytes.NewReader(body), "application/json")
-	if err != nil {
-		return fmt.Errorf("auth session request failed: %w", err)
-	}
-	defer resp.Body.Close()
+	const attempts = 12
+	var lastErr error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		resp, err := c.doRaw(http.MethodPost, "/auth/session", bytes.NewReader(body), "application/json")
+		if err != nil {
+			lastErr = fmt.Errorf("auth session request failed: %w", err)
+		} else {
+			respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+			closeErr := resp.Body.Close()
+			if readErr != nil {
+				lastErr = readErr
+			} else if closeErr != nil {
+				lastErr = closeErr
+			} else if resp.StatusCode == http.StatusOK {
+				var parsed authSessionResponse
+				if err := json.Unmarshal(respBody, &parsed); err != nil {
+					lastErr = fmt.Errorf("auth session parse failed: %w", err)
+				} else if !parsed.Authenticated {
+					// Wrong credentials are a hard failure: do not retry.
+					return fmt.Errorf("authentication rejected by server")
+				} else {
+					c.authenticated = true
+					return c.refreshCSRF()
+				}
+			} else if resp.StatusCode >= 500 {
+				lastErr = fmt.Errorf("authentication server error status %d: %s", resp.StatusCode, truncate(string(respBody), 200))
+			} else {
+				return fmt.Errorf("authentication failed status %d: %s", resp.StatusCode, truncate(string(respBody), 200))
+			}
+		}
 
-	respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	if readErr != nil {
-		return readErr
+		if attempt < attempts {
+			time.Sleep(5 * time.Second)
+		}
 	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("authentication failed status %d: %s", resp.StatusCode, truncate(string(respBody), 200))
-	}
-
-	var parsed authSessionResponse
-	if err := json.Unmarshal(respBody, &parsed); err != nil {
-		return fmt.Errorf("auth session parse failed: %w", err)
-	}
-	if !parsed.Authenticated {
-		return fmt.Errorf("authentication rejected by server")
-	}
-	c.authenticated = true
-
-	return c.refreshCSRF()
+	return fmt.Errorf("%v (after %d attempts)", lastErr, attempts)
 }
 
 // refreshCSRF reads the CSRF token from /state.

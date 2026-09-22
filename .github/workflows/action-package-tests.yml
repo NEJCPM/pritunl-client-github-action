@@ -24,14 +24,8 @@ permissions:
 
 jobs:
   packaged-linux:
-    name: "packaged-action (${{ matrix.os }})"
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-24.04
-          - os: ubuntu-24.04-arm
-    runs-on: ${{ matrix.os }}
+    name: "packaged-action (ubuntu-24.04)"
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - name: Checkout Code
@@ -118,8 +112,9 @@ jobs:
         include:
           - os: macos-15
           - os: windows-2025
+          - os: ubuntu-24.04-arm
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -140,7 +135,8 @@ jobs:
           binary="dist/pritunl-action-${os}-${arch}${suffix}"
           test -x "$binary" || { echo "::error::missing $binary"; exit 1; }
           echo "Selected: $binary"
-          (cd dist && { shasum -a 256 -c SHA256SUMS || sha256sum -c SHA256SUMS; })
+          tr -d '\r' < dist/SHA256SUMS > /tmp/SHA256SUMS
+          (cd dist && { shasum -a 256 -c /tmp/SHA256SUMS || sha256sum -c /tmp/SHA256SUMS; })
 
       # Without a profile the engine must fail fast after provisioning; this
       # still exercises the full composite -> dist binary -> provisioner path.

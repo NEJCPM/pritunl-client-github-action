@@ -20,12 +20,12 @@ const (
 	// the main branch or from a release tag of this repository.
 	cosignIdentityRegexp = `^https://github\.com/NEJCPM/pritunl-client-github-action/\.github/workflows/build-pritunl-image\.yml@refs/(heads/main|tags/.+)$`
 
-	cosignVersion    = "v2.6.1"
+	cosignVersion    = "v3.1.3"
 	cosignInstallDir = "/usr/local/bin"
 
 	// Pinned SHA-256 digests of the official cosign release binaries.
-	cosignSHAAMD64 = "064954c5d8c7e3b28188eee5b1727b31c411550bc5fefd41aa672d3c761d103a"
-	cosignSHAArm64 = "56a16480bdd56ec789abaa65924402f6b92c0041f06885995853c05567b76f34"
+	cosignSHAAMD64 = "4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71"
+	cosignSHAArm64 = "c5d324e091826b0d7a78eb16fef316450b4eb9aaec045611c08ba06f5e73220a"
 )
 
 func cosignBinaryURL(goarch string) (string, string, error) {

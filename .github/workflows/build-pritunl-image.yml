@@ -12,6 +12,7 @@ permissions:
   contents: read
   packages: write
   id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -120,7 +121,7 @@ jobs:
           echo "Multi-arch digest: ${digest}"
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.2
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Sign multi-arch image digest (keyless)
         env:
@@ -140,6 +141,45 @@ jobs:
             --certificate-identity-regexp '^https://github\.com/NEJCPM/pritunl-client-github-action/\.github/workflows/build-pritunl-image\.yml@refs/(heads/main|tags/.+)$' \
             "${DIGEST}"
 
+      - name: Generate SBOM for the multi-arch image
+        uses: anchore/sbom-action@006b7ce8314066bdf1765b4500370d40fa6917a3 # v0.24.2
+        with:
+          image: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client@${{ steps.digest.outputs.digest }}
+          format: spdx-json
+          artifact-name: sbom-${{ inputs.pritunl-version }}.spdx.json
+          upload-artifact: true
+
+      - name: Attest SBOM to the registry
+        env:
+          SBOM_FILE: sbom-${{ inputs.pritunl-version }}.spdx.json
+          DIGEST: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client@${{ steps.digest.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign attest --yes --predicate "${SBOM_FILE}" --type spdxjson "${DIGEST}"
+
+      - name: Attest build provenance (SLSA)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+
+      - name: Verify attestations with the release policy
+        env:
+          DIGEST: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client@${{ steps.digest.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign verify-attestation \
+            --type spdxjson \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github\.com/NEJCPM/pritunl-client-github-action/\.github/workflows/build-pritunl-image\.yml@refs/(heads/main|tags/.+)$' \
+            "${DIGEST}"
+          cosign verify-attestation \
+            --type slsaprovenance \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github\.com/NEJCPM/pritunl-client-github-action/\.github/workflows/build-pritunl-image\.yml@refs/(heads/main|tags/.+)$' \
+            "${DIGEST}"
+
       - name: Publish image provenance
         env:
           PRITUNL_COMMIT: ${{ needs.build.outputs.pritunl_commit }}
@@ -155,4 +195,5 @@ jobs:
             issuer=https://token.actions.githubusercontent.com
             repo=NEJCPM/pritunl-client-github-action
             workflow=build-pritunl-image.yml
+          - attestations: spdxjson SBOM + slsaprovenance (cosign keyless)
           EOF

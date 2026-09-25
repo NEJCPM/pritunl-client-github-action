@@ -141,13 +141,21 @@ jobs:
             --certificate-identity-regexp '^https://github\.com/NEJCPM/pritunl-client-github-action/\.github/workflows/build-pritunl-image\.yml@refs/(heads/main|tags/.+)$' \
             "${DIGEST}"
 
+      - name: Install syft
+        uses: anchore/sbom-action/download-syft@006b7ce8314066bdf1765b4500370d40fa6917a3 # v0.24.2
+
       - name: Generate SBOM for the multi-arch image
-        uses: anchore/sbom-action@006b7ce8314066bdf1765b4500370d40fa6917a3 # v0.24.2
+        env:
+          IMAGE_REF: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client@${{ steps.digest.outputs.digest }}
+        run: |
+          set -euo pipefail
+          syft "${IMAGE_REF}" -o spdx-json=sbom-${{ inputs.pritunl-version }}.spdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          image: ghcr.io/nejcpm/pritunl-client-github-action/pritunl-client@${{ steps.digest.outputs.digest }}
-          format: spdx-json
-          artifact-name: sbom-${{ inputs.pritunl-version }}.spdx.json
-          upload-artifact: true
+          name: sbom-${{ inputs.pritunl-version }}
+          path: sbom-${{ inputs.pritunl-version }}.spdx.json
 
       - name: Attest SBOM to the registry
         env:

@@ -87,6 +87,7 @@ runs:
         PRITUNL_READY_PROFILE_TIMEOUT: ${{ inputs.ready-profile-timeout }}
         PRITUNL_ESTABLISHED_CONNECTION_TIMEOUT: ${{ inputs.established-connection-timeout }}
         PRITUNL_CONCEALED_OUTPUTS: ${{ inputs.concealed-outputs }}
+        PRITUNL_ACTION_REF: ${{ github.action_ref }}
       shell: bash
       run: |
         set -euo pipefail
@@ -100,9 +101,38 @@ runs:
         esac
         suffix=""
         if [ "$os" = "windows" ]; then suffix=".exe"; fi
-        binary="${GITHUB_ACTION_PATH}/dist/pritunl-action-${os}-${arch}${suffix}"
+        name="pritunl-action-${os}-${arch}${suffix}"
+
+        # Prefer a locally built dist/ (development and package tests);
+        # otherwise download the binary from the release of the ref in use.
+        binary="${GITHUB_ACTION_PATH}/dist/${name}"
         if [ ! -x "$binary" ]; then
-          echo "::error::Precompiled action binary not found for ${os}-${arch}: ${binary}" >&2
-          exit 1
+          ref="${PRITUNL_ACTION_REF:-}"
+          if [[ ! "$ref" =~ ^v[0-9]+(\.[0-9]+\.[0-9]+)?$ ]]; then
+            echo "::error::No release assets for action ref '${ref:-unknown}'. Use a published major or SemVer tag (for example, @v1 or @v1.2.3)." >&2
+            exit 1
+          fi
+          base="https://github.com/NEJCPM/pritunl-client-github-action/releases/download/${ref}"
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "$workdir"' EXIT
+          curl -fsSL "$base/SHA256SUMS" -o "$workdir/SHA256SUMS"
+          curl -fsSL "$base/$name" -o "$workdir/$name"
+          if ! awk -v name="$name" '$2 == name { print; count++ } END { exit count != 1 }' \
+            "$workdir/SHA256SUMS" > "$workdir/checksum"; then
+            echo "::error::Missing or duplicate checksum entry for $name in release $ref" >&2
+            exit 1
+          fi
+          if ! (cd "$workdir" && \
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum --check checksum >/dev/null
+            else
+              shasum -a 256 --check checksum >/dev/null
+            fi); then
+            echo "::error::Checksum verification failed for $name from release $ref" >&2
+            exit 1
+          fi
+          chmod +x "$workdir/$name"
+          binary="$workdir/$name"
         fi
-        exec "$binary"
+        echo "Using action binary: $binary"
+        "$binary"

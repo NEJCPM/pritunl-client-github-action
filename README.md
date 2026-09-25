@@ -105,6 +105,14 @@ Provides input parameters for the **Pritunl Client GitHub Action**, allowing use
 > [!IMPORTANT]
 > For the `profile-file` input, ensure you convert the `tar` archive file format to `base64` text file format. Refer to the [Working with Pritunl Profile File](#working-with-pritunl-profile-file) subsection for guidance.
 
+### Binary Distribution
+
+Precompiled action binaries are published as GitHub Release assets rather than committed to the
+repository. The action downloads the binary matching the runner OS and architecture and verifies
+it against that release's `SHA256SUMS` manifest. Use a major tag such as `@v1` to follow the latest
+compatible release, or a full version tag such as `@v1.2.3` to pin the action and binary together.
+A local `dist/` binary takes precedence for development and package tests.
+
 ### Outputs
 
 Outputs essential variables from **Pritunl Client** setup, supporting and extending automation, integration, and audit processes.

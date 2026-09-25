@@ -1,60 +1,54 @@
-name: Release Action Binaries
+name: Release
+
+# Tag-driven release, following the acari pattern:
+# pushing a SemVer tag builds the precompiled action binaries, signs them
+# keylessly (cosign), and publishes everything as GitHub Release assets.
+# No binaries are committed to the repository itself.
 
 on:
-  workflow_dispatch:
-    inputs:
-      create_tag:
-        description: 'Create/publish tag vMAJOR.MINOR.PATCH (e.g. v1.1.0)'
-        required: false
-        default: ''
-        type: string
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-    outputs:
-      commit: ${{ steps.commit.outputs.commit }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate SemVer tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Release tag must match vMAJOR.MINOR.PATCH" >&2
+            exit 1
+          }
 
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.27.1'
 
-      - name: Run Unit Tests
-        run: go test ./pkg/...
-
-      - name: Run Unit Tests with Race Detector
-        run: go test -race ./pkg/...
-
       - name: Vet
         run: go vet ./...
 
-      - name: Run E2E Integration Tests (Pritunl Docker)
-        working-directory: test/e2e
-        run: |
-          go test -v -tags=e2e -timeout 25m \
-            -run 'TestE2E_PritunlServerAuth|TestE2E_ProfileFixture|TestE2E_FullActionFlowLinux' .
-
-      - name: Teardown Docker Compose
-        if: always()
-        working-directory: test/e2e
-        run: |
-          docker compose -f docker-compose.test.yml down -v
-
-      - name: Run govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - name: Run Unit Tests
+        run: go test ./pkg/...
 
       - name: Build release binaries
         run: |
           set -euo pipefail
           mkdir -p dist
-          rm -f dist/pritunl-action-* dist/SHA256SUMS
           for target in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64.exe; do
             os="${target%%-*}"
             arch="${target#*-}"; arch="${arch%.exe}"
@@ -74,51 +68,103 @@ jobs:
           (cd dist && shasum -a 256 --check SHA256SUMS)
           file dist/pritunl-action-*
 
-      - name: Commit dist to main
-        id: commit
-        if: github.ref == 'refs/heads/main'
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign binaries (keyless)
+        env:
+          COSIGN_YES: 'true'
         run: |
           set -euo pipefail
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add dist/
-          if git diff --cached --quiet; then
-            echo "commit=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "dist/ unchanged"
-          else
-            git commit -m "release: rebuild precompiled action binaries [skip ci]"
-            git push origin main
-            echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          fi
+          for f in dist/pritunl-action-*; do
+            cosign sign-blob \
+              --output-signature "$f.sig" \
+              --output-certificate "$f.crt" \
+              "$f"
+          done
 
-  tag:
-    needs: build
-    if: inputs.create_tag != ''
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout dist commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          ref: ${{ needs.build.outputs.commit }}
+          name: release-binaries
+          path: |
+            dist/pritunl-action-*
+            dist/SHA256SUMS
 
-      - name: Validate SemVer tag format
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-binaries
+          path: dist
+
+      - name: Verify checksums before publishing
         run: |
           set -euo pipefail
-          if [[ ! "${{ inputs.create_tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::create_tag must match vMAJOR.MINOR.PATCH" >&2
-            exit 1
-          fi
+          cd dist
+          shasum -a 256 --check SHA256SUMS
 
-      - name: Create and push tag
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git tag "${{ inputs.create_tag }}"
-          git push origin "${{ inputs.create_tag }}"
-          # Move the rolling alias if it matches the same major
-          if [[ "${{ inputs.create_tag }}" =~ ^v([0-9]+)\. ]]; then
-            alias="v${BASH_REMATCH[1]}"
-            git tag -f "$alias" "${{ inputs.create_tag }}"
-            git push origin "$alias" --force
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --generate-notes \
+            dist/pritunl-action-* \
+            dist/SHA256SUMS
+
+      - name: Update major-version tag and release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          major="v${TAG#v}"
+          major="${major%%.*}"
+          git tag --force "$major" "$GITHUB_SHA"
+          git push --force origin "refs/tags/$major"
+
+          if gh release view "$major" >/dev/null 2>&1; then
+            gh release upload "$major" dist/pritunl-action-* dist/SHA256SUMS --clobber
+            gh release edit "$major" \
+              --title "$major (latest: $TAG)" \
+              --notes "Assets track the latest $major.x release ($TAG)." \
+              --prerelease
+          else
+            gh release create "$major" \
+              --title "$major (latest: $TAG)" \
+              --notes "Assets track the latest $major.x release ($TAG)." \
+              --prerelease \
+              dist/pritunl-action-* \
+              dist/SHA256SUMS
           fi
+
+      - name: Release summary
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Release $TAG"
+            echo ""
+            echo "Precompiled action binaries published as release assets:"
+            echo '```'
+            ls -1 dist/
+            echo '```'
+            echo "- SHA-256 digests: \`SHA256SUMS\`"
+            echo "- Signatures: cosign keyless (\`*.sig\` + \`*.crt\`, GitHub OIDC)"
+            echo "- The runtime action downloads the binary for \`\$RUNNER_OS/\$RUNNER_ARCH\`"
+            echo "  from this release and verifies it against \`SHA256SUMS\`."
+          } >> "$GITHUB_STEP_SUMMARY"

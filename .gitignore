@@ -6,3 +6,4 @@ skills-lock.json
 coverage.out
 coverage.html
 pritunl-action
+dist/

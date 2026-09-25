@@ -86,8 +86,11 @@ func (c *PritunlAPIClient) Authenticate(username, password string) error {
 					c.authenticated = true
 					return c.refreshCSRF()
 				}
-			} else if resp.StatusCode >= 500 {
-				lastErr = fmt.Errorf("authentication server error status %d: %s", resp.StatusCode, truncate(string(respBody), 200))
+			} else if resp.StatusCode >= 500 || resp.StatusCode == http.StatusNotFound {
+				// 5xx and 404 happen while the web layer is still warming
+				// up (the container healthcheck only probes the redirect
+				// server); retry.
+				lastErr = fmt.Errorf("authentication not ready, status %d: %s", resp.StatusCode, truncate(string(respBody), 200))
 			} else {
 				return fmt.Errorf("authentication failed status %d: %s", resp.StatusCode, truncate(string(respBody), 200))
 			}

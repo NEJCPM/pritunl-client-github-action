@@ -78,8 +78,7 @@ jobs:
           set -euo pipefail
           for f in dist/pritunl-action-*; do
             cosign sign-blob \
-              --output-signature "$f.sig" \
-              --output-certificate "$f.crt" \
+              --bundle "$f.bundle" \
               "$f"
           done
 
@@ -164,7 +163,7 @@ jobs:
             ls -1 dist/
             echo '```'
             echo "- SHA-256 digests: \`SHA256SUMS\`"
-            echo "- Signatures: cosign keyless (\`*.sig\` + \`*.crt\`, GitHub OIDC)"
+            echo "- Signatures: cosign keyless bundles (\`*.bundle\`, GitHub OIDC)"
             echo "- The runtime action downloads the binary for \`\$RUNNER_OS/\$RUNNER_ARCH\`"
             echo "  from this release and verifies it against \`SHA256SUMS\`."
           } >> "$GITHUB_STEP_SUMMARY"

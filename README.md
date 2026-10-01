@@ -482,24 +482,26 @@ Thank you for your interest in contributing to our project! We appreciate your h
 * [pkg/cli](./pkg/cli) — Pritunl CLI Adapter Seam.
 * [pkg/provisioner](./pkg/provisioner) — Platform Provisioner for Linux, macOS, and Windows.
 
+**Go toolchain:** `mise.toml` is the source of truth for the Go version used locally and in GitHub Actions. Run `mise install` before local development; CI uses the pinned `jdx/mise-action` to install the version from that file. Keep the `go.mod` directive aligned with it.
+
 **Test your changes locally:**
 
 1. **Unit Tests** (Fast, in-memory mocks):
    ```bash
-   go test -v ./pkg/...
+   mise exec -- go test -v ./pkg/...
    ```
 
 2. **Test Coverage** (application packages only; the `cmd/` entrypoint and E2E tests are excluded):
    ```bash
-   go test ./pkg/... -covermode=atomic -coverprofile=coverage.out
-   go tool cover -func=coverage.out
-   go tool cover -html=coverage.out -o coverage.html
+   mise exec -- go test ./pkg/... -covermode=atomic -coverprofile=coverage.out
+   mise exec -- go tool cover -func=coverage.out
+   mise exec -- go tool cover -html=coverage.out -o coverage.html
    ```
 
 3. **Integration & E2E Tests with Docker Compose**:
    ```bash
    # Run live E2E connection tests (the suite manages the stack itself)
-   go test -v -tags=e2e -timeout 25m ./test/e2e/
+   mise exec -- go test -v -tags=e2e -timeout 25m ./test/e2e/
 
    # Teardown stack
    docker compose -f test/e2e/docker-compose.test.yml down -v
